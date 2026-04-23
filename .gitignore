@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.expo/
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Environment / Secrets
+.env
+*.json
+!app.json
+!package.json
+!eas.json
+!firebase-service-account.json.example
+
+# Build / IDE
+dist/
+build/
+web-build/
+.vscode/
+.idea/
+.DS_Store
+
+# Mobile Native
+mobile/android/
+mobile/ios/

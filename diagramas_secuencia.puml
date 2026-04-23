@@ -1,0 +1,361 @@
+@startuml RF01_Autenticacion_Google
+title RF-01: Autenticación con Google Sign-In
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "LoginScreen\n(React Native)" as APP
+participant "Google\nSign-In" as GOOGLE
+participant "Firebase\nAuth" as FIREBASE
+participant "FastAPI\n/auth/google-login" as API
+database "PostgreSQL" as DB
+
+EST -> APP: Presiona "Iniciar con Google"
+APP -> GOOGLE: GoogleSignin.signIn()
+GOOGLE --> APP: {idToken, user}
+APP -> FIREBASE: signInWithCredential(idToken)
+FIREBASE --> APP: firebaseUser + idToken
+APP -> API: POST /auth/google-login\n{id_token: firebaseIdToken}
+API -> FIREBASE: verify_firebase_token(id_token)
+FIREBASE --> API: {email, uid, name, picture}
+
+alt Usuario existe
+    API -> DB: SELECT * FROM users\nWHERE firebase_uid = uid
+    DB --> API: user record
+    API -> DB: UPDATE display_name, photo_url
+else Usuario nuevo
+    API -> DB: INSERT INTO users\n(firebase_uid, email, display_name, role='student')
+    DB --> API: new user record
+end
+
+API --> APP: UserResponse {id, email, role, xp_points, level}
+APP -> APP: AuthContext.setUser(userData)
+APP --> EST: Navega a MainTabs (Feed)
+@enduml
+
+
+@startuml RF02_Cierre_Sesion
+title RF-02: Cierre de Sesión
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "HomeScreen" as APP
+participant "Google\nSign-In" as GOOGLE
+participant "Firebase\nAuth" as FIREBASE
+
+EST -> APP: Presiona "Cerrar Sesión"
+APP -> APP: Mostrar LoadingOverlay\n"Cerrando sesión..."
+APP -> GOOGLE: GoogleSignin.signOut()
+GOOGLE --> APP: OK
+APP -> FIREBASE: firebase.auth().signOut()
+FIREBASE --> APP: OK
+APP -> APP: AuthContext.setUser(null)
+APP -> APP: Ocultar LoadingOverlay
+APP --> EST: Navega a LoginScreen\n(transición fade)
+@enduml
+
+
+@startuml RF03_Publicar_Duda
+title RF-03: Publicar Nueva Duda Académica
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "PostScreen" as APP
+participant "FastAPI\n/doubts/" as API
+participant "WebSocket\nManager" as WS
+database "PostgreSQL" as DB
+actor "Otros\nEstudiantes" as OTROS
+
+EST -> APP: Completa formulario\n(título, descripción, materia)
+EST -> APP: Presiona "Publicar"
+APP -> APP: Mostrar LoadingOverlay\n"Publicando..."
+APP -> API: POST /doubts/?author_id={id}\n{title, description, subject_id, is_anonymous}
+API -> DB: INSERT INTO doubts\n(author_id, title, description, status='open')
+DB --> API: doubt record
+API -> DB: SELECT user, subject (join data)
+DB --> API: author_name, subject_name
+API -> WS: broadcast("new_doubt", doubtData)
+WS --> OTROS: WebSocket event:\n{type: "new_doubt", data: {...}}
+API --> APP: DoubtResponse {id, title, status, author_name}
+APP -> APP: Ocultar LoadingOverlay
+APP --> EST: Alerta "Duda publicada" + navega a Feed
+OTROS -> OTROS: Feed se actualiza\nen tiempo real
+@enduml
+
+
+@startuml RF04_Ver_Feed
+title RF-04: Consultar Feed de Dudas
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "FeedScreen" as APP
+participant "FastAPI\n/doubts/feed" as API
+participant "WebSocket" as WS
+database "PostgreSQL" as DB
+
+EST -> APP: Abre tab "Feed"
+APP -> API: GET /doubts/feed?status=open
+API -> DB: SELECT doubts\nORDER BY created_at DESC\nLIMIT 20
+DB --> API: [doubt1, doubt2, ...]
+API -> DB: JOIN users, subjects\n(author_name, subject_name)
+DB --> API: enriched data
+API --> APP: [DoubtResponse, ...]
+APP --> EST: Renderiza tarjetas con\nanimación FadeInUp escalonada
+
+APP -> WS: wsService.connect()
+WS --> APP: Conexión establecida
+
+note over WS
+  Eventos en tiempo real:
+  - "new_doubt" → Agregar al feed
+  - "doubt_resolved" → Remover del feed
+end note
+
+== Filtro por materia ==
+EST -> APP: Selecciona chip "Matemática"
+APP -> API: GET /doubts/feed?subject_id=3
+API --> APP: [filtered doubts]
+APP --> EST: Feed filtrado
+@enduml
+
+
+@startuml RF05_Resolver_Duda
+title RF-05: Resolver Duda y Calificar Mentor
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Autor\n(Estudiante A)" as AUTOR
+actor "Mentor\n(Estudiante B)" as MENTOR
+participant "FeedScreen" as FEED
+participant "DoubtDetail\nScreen" as DETAIL
+participant "FastAPI\n/doubts/{id}/resolve" as API
+participant "XP Service" as XP
+participant "WebSocket" as WS
+database "PostgreSQL" as DB
+
+MENTOR -> FEED: Ve duda abierta
+MENTOR -> FEED: Presiona "Ver Detalle"
+FEED -> DETAIL: navigate('DoubtDetail', {doubt})
+DETAIL --> MENTOR: Muestra info de XP:\n"Recompensa: 50-100 XP"
+
+note over MENTOR, AUTOR
+  El mentor contacta al autor
+  y le ayuda a resolver su duda
+  (fuera de la app por ahora)
+end note
+
+AUTOR -> FEED: Ve su propia duda
+AUTOR -> DETAIL: Presiona "Ver Detalle"
+DETAIL --> AUTOR: Muestra botón\n"Marcar como Resuelta"
+AUTOR -> DETAIL: Presiona "Marcar como Resuelta"
+DETAIL --> AUTOR: Modal de calificación\n(1-5 estrellas + comentario)
+AUTOR -> DETAIL: Selecciona 4⭐ + comentario
+AUTOR -> DETAIL: Presiona "Confirmar"
+DETAIL -> API: PATCH /doubts/{id}/resolve\n{resolver_id, stars: 4, comment}
+
+API -> DB: UPDATE doubts\nSET status='resolved',\nresolved_by=mentor_id
+API -> DB: INSERT INTO ratings\n(doubt_id, reviewer_id, mentor_id, stars)
+DB --> API: OK
+API -> XP: award_xp_for_help(mentor_id, 4)
+XP -> DB: UPDATE users\nSET xp_points += 90,\ntotal_helps += 1,\nreputation = recalculated
+DB --> XP: updated mentor
+XP --> API: mentor {xp: 90, level: "Tutor Junior"}
+API -> WS: broadcast("doubt_resolved", {doubt_id})
+WS --> FEED: Evento: remover duda del feed
+API --> DETAIL: {xp_awarded: 90, mentor_level}
+DETAIL --> AUTOR: Alerta "¡Duda Resuelta!\n90 XP otorgados al mentor"
+@enduml
+
+
+@startuml RF06_Perfil_Gamificacion
+title RF-06: Consultar Perfil y Sistema de Gamificación
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "ProfileScreen" as APP
+participant "FastAPI\n/users/{id}/stats" as API
+database "PostgreSQL" as DB
+
+EST -> APP: Abre tab "Perfil"
+APP -> APP: Lee datos de AuthContext\n{display_name, email, photo_url}
+APP -> API: GET /users/{id}/stats
+API -> DB: SELECT xp_points, level,\nreputation, total_helps\nFROM users WHERE id = {id}
+DB --> API: stats data
+API --> APP: {xp_points, level, reputation, total_helps}
+
+APP -> APP: Calcular progreso XP\nhacia siguiente nivel
+APP -> APP: Animar barra de progreso\n(interpolación 0% → valor real)
+APP --> EST: Mostrar perfil con:\n- Avatar + nombre\n- Nivel actual\n- Barra XP animada\n- Reputación (estrellas)\n- Total de ayudas
+
+note right of APP
+  Niveles del sistema:
+  0-500 XP → "Novato"
+  501-1500 XP → "Tutor Junior"
+  1501-4000 XP → "Tutor Senior"
+  4000+ XP → "Mentor Académico"
+end note
+@enduml
+
+
+@startuml RF07_Admin_Stats
+title RF-07: Panel Admin - Consultar Estadísticas
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Admin" as ADM
+participant "HomeScreen" as HOME
+participant "AdminDashboard\nScreen" as ADMIN
+participant "FastAPI\n/admin/stats" as API
+database "PostgreSQL" as DB
+
+ADM -> HOME: Ve botón "Panel de Administración"\n(solo visible si role='admin')
+ADM -> HOME: Presiona botón
+HOME -> ADMIN: navigate('AdminDashboard')
+ADMIN -> API: GET /admin/stats
+API -> DB: SELECT COUNT(*) FROM users
+API -> DB: SELECT COUNT(*) FROM users\nWHERE is_active = true
+API -> DB: SELECT COUNT(*) FROM doubts
+API -> DB: SELECT COUNT(*) FROM doubts\nWHERE status = 'open'
+API -> DB: SELECT COUNT(*) FROM doubts\nWHERE status = 'resolved'
+DB --> API: counts
+API -> API: resolution_rate =\nresolved / total * 100
+API --> ADMIN: AdminStatsResponse\n{total_users, active_users,\nopen_doubts, resolved_doubts,\nresolution_rate}
+ADMIN --> ADM: Tab "Resumen" con 4 tarjetas\n+ tabla resumen general
+@enduml
+
+
+@startuml RF08_Admin_Usuarios
+title RF-08: Panel Admin - Gestión de Usuarios
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Admin" as ADM
+participant "AdminDashboard\n(Tab Usuarios)" as ADMIN
+participant "FastAPI\n/admin/users" as API
+database "PostgreSQL" as DB
+
+ADM -> ADMIN: Selecciona tab "Usuarios"
+ADMIN -> API: GET /admin/users
+API -> DB: SELECT * FROM users\nORDER BY created_at DESC
+DB --> API: [user1, user2, ...]
+API --> ADMIN: [UserListItem, ...]
+ADMIN --> ADM: Lista de usuarios con:\nnombre, email, rol, XP, estado
+
+== Cambiar Rol ==
+ADM -> ADMIN: Presiona ícono 🛡️ Shield\nen usuario "Juan"
+ADMIN -> API: PATCH /admin/users/5/toggle-role
+API -> DB: SELECT * FROM users WHERE id=5
+DB --> API: user (role='student')
+API -> DB: UPDATE users SET role='admin'\nWHERE id=5
+DB --> API: OK
+API --> ADMIN: {message, role: 'admin'}
+ADMIN -> ADMIN: Actualiza UI localmente
+ADMIN --> ADM: Alerta "Rol cambiado a admin"\nBadge cambia de "Estudiante" a "Admin"
+
+== Activar/Desactivar ==
+ADM -> ADMIN: Presiona ícono ✅/❌\nen usuario "María"
+ADMIN -> API: PATCH /admin/users/3/toggle-active
+API -> DB: UPDATE users\nSET is_active = NOT is_active\nWHERE id=3
+DB --> API: OK
+API --> ADMIN: {is_active: false}
+ADMIN --> ADM: Ícono cambia a ❌
+@enduml
+
+
+@startuml RF09_Admin_Anuncios
+title RF-09: Panel Admin - Enviar Anuncio Global
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Admin" as ADM
+participant "AdminDashboard\n(Tab Anuncio)" as ADMIN
+participant "FastAPI\n/admin/announcements" as API
+database "PostgreSQL" as DB
+
+ADM -> ADMIN: Selecciona tab "Anuncio"
+ADMIN --> ADM: Formulario:\n- Título\n- Mensaje
+
+ADM -> ADMIN: Escribe título y mensaje
+ADM -> ADMIN: Presiona "Enviar a Todos"
+ADMIN -> ADMIN: Mostrar LoadingOverlay\n"Enviando anuncio..."
+ADMIN -> API: POST /admin/announcements\n{title, body}
+API -> DB: SELECT * FROM users\nWHERE is_active = true
+DB --> API: [user1, user2, ..., userN]
+
+loop Para cada usuario activo
+    API -> DB: INSERT INTO notifications\n(user_id, title, body,\ntype='system')
+end
+
+DB --> API: OK
+API --> ADMIN: {message: "Anuncio enviado a N usuarios"}
+ADMIN -> ADMIN: Ocultar LoadingOverlay
+ADMIN --> ADM: Alerta "Anuncio enviado\na N usuarios"
+ADMIN -> ADMIN: Limpiar formulario
+@enduml
+
+
+@startuml RF10_Notificaciones
+title RF-10: Consultar Notificaciones
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante" as EST
+participant "App\n(React Native)" as APP
+participant "FastAPI\n/notifications" as API
+database "PostgreSQL" as DB
+
+EST -> APP: Consulta notificaciones
+APP -> API: GET /notifications/{user_id}
+API -> DB: SELECT * FROM notifications\nWHERE user_id = {id}\nORDER BY created_at DESC\nLIMIT 50
+DB --> API: [notif1, notif2, ...]
+API --> APP: [NotificationOut, ...]
+APP --> EST: Lista de notificaciones\n(sistema, anuncios)
+
+== Marcar como leída ==
+EST -> APP: Toca una notificación
+APP -> API: PATCH /notifications/{id}/read
+API -> DB: UPDATE notifications\nSET is_read = true\nWHERE id = {id}
+DB --> API: OK
+API --> APP: {message: "Marcada como leída"}
+@enduml
+
+
+@startuml RF11_WebSocket_Tiempo_Real
+title RF-11: Actualización en Tiempo Real (WebSocket)
+skinparam style strictuml
+skinparam backgroundColor #FAFAFA
+
+actor "Estudiante A\n(Publica)" as A
+actor "Estudiante B\n(Observa)" as B
+actor "Estudiante C\n(Observa)" as C
+participant "FastAPI\nWebSocket /ws" as WS
+participant "Connection\nManager" as CM
+
+B -> WS: ws://server:8300/ws
+WS -> CM: manager.connect(ws_B)
+CM --> B: Conexión aceptada
+
+C -> WS: ws://server:8300/ws
+WS -> CM: manager.connect(ws_C)
+CM --> C: Conexión aceptada
+
+== Nueva duda publicada ==
+A -> WS: POST /doubts/ (HTTP)
+WS -> CM: broadcast("new_doubt", data)
+CM --> B: {type: "new_doubt", data: {...}}
+CM --> C: {type: "new_doubt", data: {...}}
+B -> B: Agrega duda al feed
+C -> C: Agrega duda al feed
+
+== Duda resuelta ==
+A -> WS: PATCH /doubts/{id}/resolve (HTTP)
+WS -> CM: broadcast("doubt_resolved",\n{doubt_id, resolver_id})
+CM --> B: {type: "doubt_resolved", data: {...}}
+CM --> C: {type: "doubt_resolved", data: {...}}
+B -> B: Remueve duda del feed
+C -> C: Remueve duda del feed
+@enduml
