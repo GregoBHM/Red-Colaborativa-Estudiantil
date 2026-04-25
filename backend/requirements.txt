@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+websockets
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+python-multipart
+firebase-admin
+python-dotenv
+alembic
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib

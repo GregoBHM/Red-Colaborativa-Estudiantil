@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: red_colaborativa_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "RedColab_DB_Pass_2026!XyZ"
+      POSTGRES_DB: mentoria_academica
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  api:
+    build: .
+    container_name: red_colaborativa_api
+    restart: always
+    ports:
+      - "8300:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+
+volumes:
+  postgres_data:

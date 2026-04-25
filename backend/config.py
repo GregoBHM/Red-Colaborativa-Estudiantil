@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
+    # Google Calendar / Meet
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = "./google-service-account.json"
+    GOOGLE_CALENDAR_ID: str = "primary"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
