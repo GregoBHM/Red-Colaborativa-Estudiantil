@@ -18,6 +18,7 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     photo_url: Optional[str] = None
     career: Optional[str] = None
+    student_code: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -26,6 +27,7 @@ class UserResponse(BaseModel):
     email: str
     display_name: str
     photo_url: Optional[str] = None
+    student_code: Optional[str] = None
     career: Optional[str] = "Sin especificar"
     role: str = "student"
     xp_points: int = 0

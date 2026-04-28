@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -27,6 +27,9 @@ class DoubtResponse(BaseModel):
     resolved_by: Optional[int] = None
     created_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
+    likes_count: int = 0
+    liked_by: List[int] = []
+    comments_count: int = 0
 
     class Config:
         from_attributes = True
