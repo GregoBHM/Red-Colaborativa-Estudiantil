@@ -101,10 +101,7 @@ async def create_doubt(payload: DoubtCreate, author_id: int = None, db: Session 
     db.refresh(doubt)
 
     response = _build_doubt_response(db, doubt)
-
-    # Emitir evento en tiempo real
     await manager.broadcast("new_doubt", response.model_dump())
-
     return response
 
 
@@ -120,14 +117,12 @@ async def toggle_like_doubt(doubt_id: int, user_id: int = None, db: Session = De
     liked_by = list(doubt.liked_by or [])
 
     if user_id in liked_by:
-        # Unlike
         liked_by.remove(user_id)
         doubt.liked_by = liked_by
         doubt.likes_count = len(liked_by)
         db.commit()
         return {"action": "unliked", "likes_count": doubt.likes_count}
     else:
-        # Like
         liked_by.append(user_id)
         doubt.liked_by = liked_by
         doubt.likes_count = len(liked_by)
@@ -159,8 +154,6 @@ async def resolve_doubt(doubt_id: int, payload: DoubtResolve, db: Session = Depe
     db.commit()
 
     updated_mentor = award_xp_for_help(db, payload.resolver_id, payload.stars)
-
-    # Emitir evento en tiempo real
     await manager.broadcast("doubt_resolved", {"doubt_id": doubt_id, "resolver_id": payload.resolver_id})
 
     return {
@@ -187,12 +180,10 @@ async def delete_doubt(doubt_id: int, user_id: int = None, db: Session = Depends
     if doubt.author_id != user_id and user.role != "admin":
         raise HTTPException(status_code=403, detail="No tienes permiso para eliminar esta duda")
 
-    # Soft delete — preserve chat history
     doubt.is_deleted = True
     db.commit()
 
     await manager.broadcast("doubt_deleted", {"doubt_id": doubt_id})
-
     return {"message": "Duda eliminada exitosamente"}
 
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql import func
 from typing import List, Optional
 from pydantic import BaseModel
@@ -16,7 +16,6 @@ from ws_manager import manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-# --- Palabras prohibidas para moderación ---
 BANNED_WORDS = [
     "pago", "dinero", "cobro", "precio", "transferencia",
     "yape", "plin", "bitcoin", "cuenta", "deposito",
@@ -28,8 +27,6 @@ def check_flagged(content: str) -> bool:
     lower = content.lower()
     return any(word in lower for word in BANNED_WORDS)
 
-
-# --- Schemas ---
 
 class ChatRoomCreate(BaseModel):
     doubt_id: int
@@ -89,11 +86,8 @@ class MeetOut(BaseModel):
     scheduled_at: datetime
 
 
-# --- Endpoints ---
-
 @router.post("/rooms", response_model=ChatRoomOut, status_code=status.HTTP_201_CREATED)
 async def create_chat_room(payload: ChatRoomCreate, db: Session = Depends(get_db)):
-    # Si ya existe una sala activa para esta duda con este mentor, devolver esa sala
     existing = (
         db.query(ChatRoom)
         .filter(
@@ -126,39 +120,45 @@ async def get_user_rooms(user_id: int, db: Session = Depends(get_db)):
         .order_by(ChatRoom.created_at.desc())
         .all()
     )
-    # Filtrar en memoria por facilidad con arrays JSON
     visible_rooms = [r for r in rooms if user_id not in (r.hidden_by or [])]
     return [_build_room_out(db, r) for r in visible_rooms]
 
 
 @router.get("/rooms/{room_id}/messages", response_model=List[MessageOut])
-async def get_room_messages(room_id: int, db: Session = Depends(get_db)):
+async def get_room_messages(
+    room_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
     room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
 
     messages = (
         db.query(ChatMessage)
+        .options(joinedload(ChatMessage.sender))
         .filter(ChatMessage.chat_room_id == room_id)
         .order_by(ChatMessage.created_at.asc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
-    result = []
-    for m in messages:
-        sender = db.query(User).filter(User.id == m.sender_id).first()
-        result.append(MessageOut(
+    return [
+        MessageOut(
             id=m.id,
             chat_room_id=m.chat_room_id,
             sender_id=m.sender_id,
-            sender_name=sender.display_name if sender else "Desconocido",
-            sender_photo=sender.photo_url if sender else None,
+            sender_name=m.sender.display_name if m.sender else "Desconocido",
+            sender_photo=m.sender.photo_url if m.sender else None,
             content="Este mensaje fue eliminado" if m.is_deleted else m.content,
             is_flagged=m.is_flagged,
             status=m.status or "sent",
             is_deleted=m.is_deleted or False,
             created_at=m.created_at,
-        ))
-    return result
+        )
+        for m in messages
+    ]
 
 
 @router.post("/rooms/{room_id}/messages", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
@@ -169,7 +169,6 @@ async def send_message(room_id: int, payload: MessageCreate, db: Session = Depen
     if room.status == "closed":
         raise HTTPException(status_code=400, detail="Esta sala está cerrada")
 
-    # Verificar que el sender es parte de la sala
     if payload.sender_id not in (room.mentor_id, room.student_id):
         raise HTTPException(status_code=403, detail="No eres parte de esta sala")
 
@@ -200,10 +199,8 @@ async def send_message(room_id: int, payload: MessageCreate, db: Session = Depen
         created_at=message.created_at,
     )
 
-    # Emitir por WebSocket al room
     await manager.send_to_room(room_id, "new_message", msg_out.model_dump(mode="json"))
 
-    # Push notification al otro participante
     recipient_id = room.student_id if payload.sender_id == room.mentor_id else room.mentor_id
     sender_name = sender.display_name if sender else "Alguien"
     create_and_push_notification(
@@ -233,7 +230,6 @@ async def schedule_session(room_id: int, payload: ScheduleUpdate, db: Session = 
         "scheduled_at": payload.scheduled_at.isoformat(),
     })
 
-    # Push notification al estudiante
     mentor = db.query(User).filter(User.id == room.mentor_id).first()
     create_and_push_notification(
         db, room.student_id,
@@ -259,7 +255,6 @@ async def create_google_meet(
     if room.status == "closed":
         raise HTTPException(status_code=400, detail="No se puede crear Meet en sala cerrada")
 
-    # Solo el mentor autoriza la creación del Meet
     if requester_id and requester_id != room.mentor_id:
         raise HTTPException(status_code=403, detail="Solo el mentor puede crear el Meet")
 
@@ -267,15 +262,14 @@ async def create_google_meet(
     student = db.query(User).filter(User.id == room.student_id).first()
     doubt = db.query(Doubt).filter(Doubt.id == room.doubt_id).first()
 
-    # Determinar fecha/hora del evento
     from datetime import timezone
     from datetime import datetime as dt
-    
+
     if start_dt:
         start_time = dt.fromisoformat(start_dt.replace("Z", "+00:00"))
     else:
         start_time = room.scheduled_at or dt.now(timezone.utc).replace(tzinfo=timezone.utc)
-        
+
     if start_time.tzinfo is None:
         start_time = start_time.replace(tzinfo=timezone.utc)
 
@@ -301,8 +295,7 @@ async def create_google_meet(
             attendees=attendees,
             delegate_email=mentor.email if mentor else None,
         )
-    except Exception as e:
-        # Fallback silencioso a Jitsi Meet para que la app nunca muestre error
+    except Exception:
         room_hash = f"rce-upt-{int(start_time.timestamp())}"
         meet_data = {
             "meet_link": f"https://meet.jit.si/{room_hash}",
@@ -310,20 +303,17 @@ async def create_google_meet(
             "html_link": "",
         }
 
-    # Guardar el meet_link en la sala
     room.meet_link = meet_data["meet_link"]
     if not room.scheduled_at:
         room.scheduled_at = start_time
     db.commit()
 
-    # Notificar vía WebSocket
     await manager.send_to_room(room_id, "meet_created", {
         "room_id": room_id,
         "meet_link": meet_data["meet_link"],
         "scheduled_at": start_time.isoformat(),
     })
 
-    # Push notification al estudiante
     mentor_name = mentor.display_name if mentor else "Tu mentor"
     create_and_push_notification(
         db, room.student_id,
@@ -347,20 +337,16 @@ async def delete_google_meet(
     requester_id: int,
     db: Session = Depends(get_db),
 ):
-    """
-    Elimina el enlace de Meet actual de la sala.
-    Solo el mentor puede hacerlo.
-    """
     room = db.query(ChatRoom).filter(ChatRoom.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
     if requester_id != room.mentor_id:
         raise HTTPException(status_code=403, detail="Solo el mentor puede eliminar el Meet")
-    
+
     room.meet_link = None
     room.event_id = None
     db.commit()
-    
+
     student = db.query(User).filter(User.id == room.student_id).first()
     if student:
         create_and_push_notification(
@@ -383,12 +369,10 @@ async def close_chat_room(room_id: int, payload: CloseRoom, db: Session = Depend
     if room.status == "closed":
         raise HTTPException(status_code=400, detail="Esta sala ya está cerrada")
 
-    # Cerrar la sala
     room.status = "closed"
     room.closed_at = func.now()
     db.commit()
 
-    # Crear rating
     rating = Rating(
         doubt_id=room.doubt_id,
         reviewer_id=room.student_id,
@@ -399,10 +383,8 @@ async def close_chat_room(room_id: int, payload: CloseRoom, db: Session = Depend
     db.add(rating)
     db.commit()
 
-    # Otorgar XP al mentor
     updated_mentor = award_xp_for_help(db, room.mentor_id, payload.stars)
 
-    # Marcar la duda como resuelta si aún no lo está
     doubt = db.query(Doubt).filter(Doubt.id == room.doubt_id).first()
     if doubt and doubt.status == "open":
         doubt.status = "resolved"
@@ -410,13 +392,11 @@ async def close_chat_room(room_id: int, payload: CloseRoom, db: Session = Depend
         doubt.resolved_at = func.now()
         db.commit()
 
-    # Notificar por WebSocket
     await manager.send_to_room(room_id, "room_closed", {"room_id": room_id})
     await manager.broadcast("doubt_resolved", {"doubt_id": room.doubt_id, "resolver_id": room.mentor_id})
 
     xp_awarded = 50 + (payload.stars * 10)
 
-    # Push notification al mentor
     create_and_push_notification(
         db, room.mentor_id,
         title="¡Recibiste XP! ⚡",
@@ -432,8 +412,6 @@ async def close_chat_room(room_id: int, payload: CloseRoom, db: Session = Depend
         "mentor_level": updated_mentor.level if updated_mentor else "Novato",
     }
 
-
-# --- Helper ---
 
 def _build_room_out(db: Session, room: ChatRoom) -> ChatRoomOut:
     mentor = db.query(User).filter(User.id == room.mentor_id).first()
@@ -466,11 +444,8 @@ def _build_room_out(db: Session, room: ChatRoom) -> ChatRoomOut:
     )
 
 
-# --- Read Receipts ---
-
 @router.patch("/rooms/{room_id}/messages/read")
 async def mark_messages_read(room_id: int, user_id: int = None, db: Session = Depends(get_db)):
-    """Marca todos los mensajes no leídos de la otra persona como 'read'."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id es requerido")
 
@@ -478,7 +453,6 @@ async def mark_messages_read(room_id: int, user_id: int = None, db: Session = De
     if not room:
         raise HTTPException(status_code=404, detail="Sala no encontrada")
 
-    # Actualizar mensajes del otro usuario (no los míos) a 'read'
     updated = (
         db.query(ChatMessage)
         .filter(
@@ -491,7 +465,6 @@ async def mark_messages_read(room_id: int, user_id: int = None, db: Session = De
     db.commit()
 
     if updated > 0:
-        # Notificar al remitente que sus mensajes fueron leídos
         await manager.send_to_room(room_id, "messages_read", {
             "room_id": room_id,
             "reader_id": user_id,
@@ -500,11 +473,8 @@ async def mark_messages_read(room_id: int, user_id: int = None, db: Session = De
     return {"updated": updated}
 
 
-# --- Soft Delete ---
-
 @router.delete("/messages/{message_id}")
 async def soft_delete_message(message_id: int, user_id: int = None, db: Session = Depends(get_db)):
-    """Soft-delete de un mensaje. El contenido se oculta pero se mantiene en BD para auditoría."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id es requerido")
 
@@ -512,7 +482,6 @@ async def soft_delete_message(message_id: int, user_id: int = None, db: Session 
     if not message:
         raise HTTPException(status_code=404, detail="Mensaje no encontrado")
 
-    # Solo el autor del mensaje puede eliminarlo
     user = db.query(User).filter(User.id == user_id).first()
     if message.sender_id != user_id and (not user or user.role != "admin"):
         raise HTTPException(status_code=403, detail="No tienes permiso para eliminar este mensaje")
@@ -520,7 +489,6 @@ async def soft_delete_message(message_id: int, user_id: int = None, db: Session 
     message.is_deleted = True
     db.commit()
 
-    # Notificar a la sala que el mensaje fue eliminado
     await manager.send_to_room(message.chat_room_id, "message_deleted", {
         "message_id": message_id,
         "room_id": message.chat_room_id,
@@ -531,7 +499,6 @@ async def soft_delete_message(message_id: int, user_id: int = None, db: Session 
 
 @router.delete("/rooms/{room_id}")
 async def hide_chat_room(room_id: int, user_id: int = None, db: Session = Depends(get_db)):
-    """Oculta una sala de chat para un usuario específico (Borrado lógico del chat)."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id es requerido")
 

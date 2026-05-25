@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, StatusBar,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image, StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -18,10 +18,11 @@ GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const insets = useSafeAreaInsets();
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
+    setIsLoadingGoogle(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const userInfo = await GoogleSignin.signIn();
@@ -40,7 +41,7 @@ export default function LoginScreen() {
         Alert.alert('Error de Autenticación', error.message || 'No se pudo iniciar sesión.', [{ text: 'OK' }]);
       }
     } finally {
-      setIsLoading(false);
+      setIsLoadingGoogle(false);
     }
   };
 
@@ -80,12 +81,12 @@ export default function LoginScreen() {
         </Text>
 
         <TouchableOpacity
-          style={[styles.googleBtn, isLoading && styles.googleBtnDisabled]}
+          style={[styles.googleBtn, isLoadingGoogle && styles.googleBtnDisabled]}
           onPress={handleGoogleLogin}
-          disabled={isLoading}
+          disabled={isLoadingGoogle}
           activeOpacity={0.8}
         >
-          {isLoading ? (
+          {isLoadingGoogle ? (
             <View style={styles.loadingRow}>
               <ActivityIndicator color={COLORS.primary} size="small" />
               <Text style={styles.loadingText}>Conectando...</Text>
@@ -109,6 +110,7 @@ export default function LoginScreen() {
         <Text style={styles.footerText}>
           Plataforma de mentoría académica P2P
         </Text>
+
       </Animated.View>
     </View>
   );

@@ -15,11 +15,6 @@ def create_and_push_notification(
     notification_type: str = "general",
     reference_id: int = None,
 ):
-    """
-    Creates a notification in the database AND sends a push notification
-    via Firebase Cloud Messaging if the user has an FCM token registered.
-    """
-    # 1. Save to database
     notif = Notification(
         user_id=user_id,
         title=title,
@@ -31,7 +26,6 @@ def create_and_push_notification(
     db.commit()
     db.refresh(notif)
 
-    # 2. Send push notification via FCM
     user = db.query(User).filter(User.id == user_id).first()
     if user and user.fcm_token:
         try:
@@ -50,7 +44,6 @@ def create_and_push_notification(
             messaging.send(message)
             logger.info(f"Push sent to user {user_id}")
         except messaging.UnregisteredError:
-            # Token is invalid, clear it
             user.fcm_token = None
             db.commit()
             logger.warning(f"Cleared invalid FCM token for user {user_id}")
