@@ -7,7 +7,7 @@ RCE UPT es una plataforma integral diseñada para estudiantes universitarios que
 
 ## 🚀 Características Principales
 
-*   **📸 Consultas Visuales:** Sube fotos de tus ejercicios para obtener ayuda rápida sin redactar fórmulas complejas.
+*   **📸 Consultas Visuales:** Sube fotos de tus ejercicioss para obtener ayuda rápida sin redactar fórmulas complejas.
 *   **🎮 Gamificación (Sistema XP):** Gana experiencia ayudando a otros. Sube de nivel desde *Novato* hasta *Mentor Académico*.
 *   **💬 Chat en Tiempo Real:** Comunicación instantánea con otros estudiantes a través de WebSockets.
 *   **🛡️ Moderación Anti-Monetización:** Filtros NLP y detección de QRs para mantener la red 100% colaborativa y libre de cobros externos.
