@@ -6,3 +6,4 @@ from models.notification import Notification
 from models.comment import Comment
 from models.chat import ChatRoom, ChatMessage
 from models.career import Career
+from models.university_student import UniversityStudent

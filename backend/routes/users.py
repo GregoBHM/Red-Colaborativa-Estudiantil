@@ -56,7 +56,6 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{user_id}/fcm-token")
 async def register_fcm_token(user_id: int, payload: FCMTokenPayload, db: Session = Depends(get_db)):
-    """Register or update the FCM push notification token for a user."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

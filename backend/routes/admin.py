@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -7,6 +7,7 @@ from database import get_db
 from models.user import User
 from models.doubt import Doubt
 from models.notification import Notification
+from services.upt_scraper import sync_upt_data
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -96,3 +97,12 @@ async def send_global_announcement(payload: AnnouncementCreate, db: Session = De
         count += 1
     db.commit()
     return {"message": f"Anuncio enviado a {count} usuarios"}
+
+@router.post("/sync-students")
+async def trigger_student_sync(background_tasks: BackgroundTasks):
+    """
+    Inicia la sincronización de alumnos de la UPT en segundo plano.
+    Ideal para ser llamado por un administrador a través de un botón.
+    """
+    background_tasks.add_task(sync_upt_data)
+    return {"message": "Sincronización de alumnos iniciada en segundo plano."}
