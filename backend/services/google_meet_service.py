@@ -54,7 +54,6 @@ def create_meet_event(
         try:
             service = _get_service(None)
         except Exception:
-            # Si no hay servicio de Google disponible, fallback directo a Jitsi
             if start_dt.tzinfo is None:
                 start_dt = start_dt.replace(tzinfo=timezone.utc)
             end_dt = start_dt + timedelta(minutes=duration_minutes)
@@ -105,7 +104,6 @@ def create_meet_event(
     calendar_id = getattr(settings, "GOOGLE_CALENDAR_ID", "primary")
 
     try:
-        # 1. Intentamos crear el evento de Google Calendar completo con Google Meet
         created_event = (
             service.events()
             .insert(
@@ -120,19 +118,14 @@ def create_meet_event(
             "conferenceData", {}
         ).get("entryPoints", [{}])[0].get("uri", "")
 
-        # Si el evento se creó pero no tiene enlace de videollamada, usamos Jitsi Meet
         if not meet_link:
             room_hash = f"rce-upt-{int(start_dt.timestamp())}"
             meet_link = f"https://meet.jit.si/{room_hash}"
 
-    except Exception as e:
-        error_str = str(e)
-        # Si el error es por delegación/cuenta de servicio/tipo de conferencia inválido:
-        # Hacemos fallback completo a Jitsi Meet y creamos el evento en Google Calendar de forma simple (sin Meet)
-        # para que quede registrado en el calendario de todas maneras.
+    except Exception:
         event_body.pop("conferenceData", None)
         event_body.pop("attendees", None)
-        
+
         try:
             created_event = (
                 service.events()

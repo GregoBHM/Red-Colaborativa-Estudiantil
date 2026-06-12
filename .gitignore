@@ -12,6 +12,7 @@ env/
 *.json
 !app.json
 !package.json
+!package-lock.json
 !eas.json
 !firebase-service-account.json.example
 
