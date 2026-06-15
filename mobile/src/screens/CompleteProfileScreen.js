@@ -82,8 +82,7 @@ export default function CompleteProfileScreen() {
       });
       if (!res.ok) throw new Error('Error al guardar');
       const updated = await res.json();
-      // Actualizar sesión local con los nuevos datos
-      await signIn({ ...user, ...updated });
+      await signIn({ ...user, career: updated.career, student_code: updated.student_code });
     } catch (err) {
       Alert.alert('Error', 'No se pudo guardar tu perfil. Intenta de nuevo.');
     } finally {
