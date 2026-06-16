@@ -15,13 +15,11 @@ from config import get_settings
 from ws_manager import manager
 import json
 import models
+from models.career import Career
 
 settings = get_settings()
 
 Base.metadata.create_all(bind=engine)
-
-
-
 
 
 app = FastAPI(
