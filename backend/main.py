@@ -10,12 +10,18 @@ from routes.comments import router as comments_router
 from routes.chat import router as chat_router
 from routes.verification import router as verification_router
 from services.upt_scraper import sync_upt_data
-import asyncio
 from config import get_settings
 from ws_manager import manager
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from database import get_db
+from typing import List, Optional
+from pydantic import BaseModel
+from models.career import Career
+from models.university_student import UniversityStudent
+import asyncio
 import json
 import models
-from models.career import Career
 
 settings = get_settings()
 
@@ -45,9 +51,9 @@ inner_app.include_router(comments_router, prefix="/api/v1")
 inner_app.include_router(chat_router, prefix="/api/v1")
 inner_app.include_router(verification_router, prefix="/api/v1")
 
+
 @inner_app.on_event("startup")
 async def startup_event():
-    # Lanzar la sincronización de alumnos en background para no bloquear el inicio
     asyncio.create_task(sync_upt_data())
 
 
@@ -66,13 +72,6 @@ async def health_check():
     return {"status": "healthy"}
 
 
-from sqlalchemy.orm import Session
-from fastapi import Depends
-from database import get_db
-from typing import List
-from pydantic import BaseModel
-
-
 class CareerOut(BaseModel):
     id: int
     name: str
@@ -85,6 +84,29 @@ class CareerOut(BaseModel):
 @inner_app.get("/api/v1/careers", response_model=List[CareerOut])
 async def get_careers(db: Session = Depends(get_db)):
     return db.query(Career).order_by(Career.name).all()
+
+
+@inner_app.get("/api/v1/students")
+async def get_students(
+    career_name: Optional[str] = None,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    query = db.query(UniversityStudent)
+    if career_name:
+        query = query.join(Career).filter(Career.name.ilike(f"%{career_name}%"))
+    students = query.limit(limit).all()
+    return {
+        "total_mostrados": len(students),
+        "alumnos": [
+            {
+                "id": s.id,
+                "full_name": s.full_name,
+                "cycle": s.cycle,
+                "career_id": s.career_id
+            } for s in students
+        ]
+    }
 
 
 @inner_app.websocket("/ws")
@@ -125,10 +147,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
 
-# --- Enrutador Mágico para Dokploy ---
+
 app = FastAPI()
 app.mount("/movilesii", inner_app)
 app.mount("/", inner_app)
+
 
 if __name__ == "__main__":
     import uvicorn
