@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base, SessionLocal
+from database import engine, Base
 from routes.auth import router as auth_router
 from routes.doubts import router as doubts_router
 from routes.users import router as users_router
@@ -15,54 +15,22 @@ from config import get_settings
 from ws_manager import manager
 import json
 import models
-from models.career import Career
 
 settings = get_settings()
 
 Base.metadata.create_all(bind=engine)
 
 
-def seed_careers():
-    db = SessionLocal()
-    try:
-        if db.query(Career).count() == 0:
-            careers_data = [
-                ("Ingeniería de Sistemas", "FAING"),
-                ("Ingeniería Civil", "FAING"),
-                ("Ingeniería Electrónica", "FAING"),
-                ("Ingeniería Ambiental", "FAING"),
-                ("Ingeniería Agroindustrial", "FAING"),
-                ("Ingeniería Comercial", "FACEE"),
-                ("Ingeniería Industrial", "FAING"),
-                ("Arquitectura", "FAU"),
-                ("Derecho", "FADE"),
-                ("Educación", "FAEDCOH"),
-                ("Medicina Humana", "FACSA"),
-                ("Odontología", "FACSA"),
-                ("Psicología", "FAEDCOH"),
-                ("Administración de Negocios Internacionales", "FACEE"),
-                ("Ciencias Contables y Financieras", "FACEE"),
-                ("Economía", "FACEE"),
-            ]
-            for name, faculty in careers_data:
-                db.add(Career(name=name, faculty=faculty))
-            db.commit()
-            print(f"✅ {len(careers_data)} carreras UPT insertadas correctamente")
-    except Exception as e:
-        print(f"⚠️ Error al insertar carreras seed: {e}")
-        db.rollback()
-    finally:
-        db.close()
 
-
-seed_careers()
 
 
 app = FastAPI(
-    title="Mentoría Académica API",
-    description="API para la plataforma de mentoría académica P2P de la UPT",
+    title="API Red Colaborativa Estudiantil UPT",
+    description="API para la plataforma de mentoría académica P2P de la Universidad Privada de Tacna",
     version="2.0.0",
     root_path=settings.ROOT_PATH,
+    docs_url="/movilesii/docs",
+    openapi_url="/movilesii/openapi.json",
 )
 
 app.add_middleware(
@@ -91,9 +59,9 @@ async def startup_event():
 @app.get("/")
 async def root():
     return {
-        "app": "Mentoría Académica API",
+        "app": "API Red Colaborativa Estudiantil UPT",
         "version": "2.0.0",
-        "status": "running",
+        "status": "En línea y funcionando 🚀",
         "docs": "/docs",
     }
 
