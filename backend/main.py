@@ -22,14 +22,13 @@ settings = get_settings()
 Base.metadata.create_all(bind=engine)
 
 
-app = FastAPI(
+inner_app = FastAPI(
     title="API Red Colaborativa Estudiantil UPT",
     description="API para la plataforma de mentoría académica P2P de la Universidad Privada de Tacna",
     version="2.0.0",
-    root_path=settings.ROOT_PATH or "/movilesii",
 )
 
-app.add_middleware(
+inner_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
@@ -37,32 +36,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(doubts_router, prefix="/api/v1")
-app.include_router(users_router, prefix="/api/v1")
-app.include_router(notifications_router, prefix="/api/v1")
-app.include_router(admin_router, prefix="/api/v1")
-app.include_router(comments_router, prefix="/api/v1")
-app.include_router(chat_router, prefix="/api/v1")
-app.include_router(verification_router, prefix="/api/v1")
+inner_app.include_router(auth_router, prefix="/api/v1")
+inner_app.include_router(doubts_router, prefix="/api/v1")
+inner_app.include_router(users_router, prefix="/api/v1")
+inner_app.include_router(notifications_router, prefix="/api/v1")
+inner_app.include_router(admin_router, prefix="/api/v1")
+inner_app.include_router(comments_router, prefix="/api/v1")
+inner_app.include_router(chat_router, prefix="/api/v1")
+inner_app.include_router(verification_router, prefix="/api/v1")
 
-@app.on_event("startup")
+@inner_app.on_event("startup")
 async def startup_event():
     # Lanzar la sincronización de alumnos en background para no bloquear el inicio
     asyncio.create_task(sync_upt_data())
 
 
-@app.get("/")
+@inner_app.get("/")
 async def root():
     return {
         "app": "API Red Colaborativa Estudiantil UPT",
         "version": "2.0.0",
         "status": "En línea y funcionando 🚀",
-        "docs": "/movilesii/docs",
+        "docs": "/docs",
     }
 
 
-@app.get("/health")
+@inner_app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
@@ -83,12 +82,12 @@ class CareerOut(BaseModel):
         from_attributes = True
 
 
-@app.get("/api/v1/careers", response_model=List[CareerOut])
+@inner_app.get("/api/v1/careers", response_model=List[CareerOut])
 async def get_careers(db: Session = Depends(get_db)):
     return db.query(Career).order_by(Career.name).all()
 
 
-@app.websocket("/ws")
+@inner_app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
@@ -126,6 +125,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
 
+# --- Enrutador Mágico para Dokploy ---
+app = FastAPI()
+app.mount("/movilesii", inner_app)
+app.mount("/", inner_app)
 
 if __name__ == "__main__":
     import uvicorn
