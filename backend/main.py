@@ -26,9 +26,7 @@ app = FastAPI(
     title="API Red Colaborativa Estudiantil UPT",
     description="API para la plataforma de mentoría académica P2P de la Universidad Privada de Tacna",
     version="2.0.0",
-    root_path=settings.ROOT_PATH,
-    docs_url="/movilesii/docs",
-    openapi_url="/movilesii/openapi.json",
+    root_path=settings.ROOT_PATH or "/movilesii",
 )
 
 app.add_middleware(
@@ -60,7 +58,7 @@ async def root():
         "app": "API Red Colaborativa Estudiantil UPT",
         "version": "2.0.0",
         "status": "En línea y funcionando 🚀",
-        "docs": "/docs",
+        "docs": "/movilesii/docs",
     }
 
 
