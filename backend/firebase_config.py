@@ -9,7 +9,8 @@ settings = get_settings()
 
 _firebase_b64 = os.getenv("FIREBASE_CREDENTIALS_JSON")
 if _firebase_b64:
-    cred = credentials.Certificate(json.loads(base64.b64decode(_firebase_b64).decode()))
+    _firebase_b64 += "=" * ((4 - len(_firebase_b64) % 4) % 4)
+    cred = credentials.Certificate(json.loads(base64.b64decode(_firebase_b64).decode("utf-8")))
 else:
     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
 firebase_app = firebase_admin.initialize_app(cred)
