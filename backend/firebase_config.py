@@ -1,14 +1,15 @@
 import firebase_admin
 import json
 import os
+import base64
 from firebase_admin import credentials, auth
 from config import get_settings
 
 settings = get_settings()
 
-_firebase_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
-if _firebase_json:
-    cred = credentials.Certificate(json.loads(_firebase_json))
+_firebase_b64 = os.getenv("FIREBASE_CREDENTIALS_JSON")
+if _firebase_b64:
+    cred = credentials.Certificate(json.loads(base64.b64decode(_firebase_b64).decode()))
 else:
     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
 firebase_app = firebase_admin.initialize_app(cred)
