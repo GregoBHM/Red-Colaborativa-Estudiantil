@@ -7,18 +7,22 @@ from config import get_settings
 
 settings = get_settings()
 
-_firebase_env = os.getenv("FIREBASE_CREDENTIALS_JSON")
+part1 = os.getenv("FIREBASE_B64_1", "")
+part2 = os.getenv("FIREBASE_B64_2", "")
+
+_firebase_env = part1 + part2
+if not _firebase_env:
+    _firebase_env = os.getenv("FIREBASE_CREDENTIALS_JSON", "")
+
 if _firebase_env:
     _firebase_env = _firebase_env.strip()
     if _firebase_env.startswith("{"):
         # Se pegó el JSON en texto plano
-        # Reemplazar \\n por \n real en caso de que Dokploy lo haya escapado
         clean_json = _firebase_env.replace('\\n', '\n')
         cred = credentials.Certificate(json.loads(clean_json))
     else:
         # Se pegó en formato Base64
         import re
-        # Limpiar cualquier caracter raro que se haya colado al pegar
         b64_clean = re.sub(r'[^a-zA-Z0-9+/=]', '', _firebase_env)
         b64_clean += "=" * ((4 - len(b64_clean) % 4) % 4)
         cred = credentials.Certificate(json.loads(base64.b64decode(b64_clean).decode("utf-8")))
