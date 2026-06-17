@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import List, Optional
 from database import get_db
 from models.user import User
 from schemas.user import UserResponse, UserUpdate
@@ -69,3 +70,44 @@ async def register_fcm_token(
     user.fcm_token = payload.fcm_token
     db.commit()
     return {"message": "FCM token registrado"}
+
+
+class LeaderboardItem(BaseModel):
+    id: int
+    display_name: str
+    photo_url: Optional[str] = None
+    career: Optional[str] = None
+    xp_points: int
+    level: Optional[str] = None
+    reputation: float
+    total_helps: int
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/leaderboard", response_model=List[LeaderboardItem])
+async def get_leaderboard(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    users = (
+        db.query(User)
+        .filter(User.is_active, User.total_helps > 0)
+        .order_by(User.xp_points.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        LeaderboardItem(
+            id=u.id,
+            display_name=u.display_name,
+            photo_url=u.photo_url,
+            career=u.career,
+            xp_points=u.xp_points,
+            level=u.level,
+            reputation=u.reputation,
+            total_helps=u.total_helps,
+        )
+        for u in users
+    ]

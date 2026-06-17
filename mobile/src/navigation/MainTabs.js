@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import FeedScreen from '../screens/FeedScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import PostScreen from '../screens/PostScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { COLORS, FONTS, SPACING, RADIUS } from '../constants/theme';
 
@@ -16,7 +16,7 @@ const TAB_CONFIG = {
   Feed:          { label: 'Inicio',   icon: 'home',            iconOutline: 'home-outline' },
   Chats:         { label: 'Chats',    icon: 'chatbubbles',     iconOutline: 'chatbubbles-outline' },
   Post:          { label: 'Publicar', icon: 'add',             iconOutline: 'add' },
-  Notifications: { label: 'Avisos',   icon: 'notifications',   iconOutline: 'notifications-outline' },
+  Ranking:       { label: 'Ranking',  icon: 'trophy',          iconOutline: 'trophy-outline' },
   Profile:       { label: 'Perfil',   icon: 'person',          iconOutline: 'person-outline' },
 };
 
@@ -69,7 +69,7 @@ export default function MainTabs() {
       <Tab.Screen name="Feed" component={FeedScreen} />
       <Tab.Screen name="Chats" component={ChatListScreen} />
       <Tab.Screen name="Post" component={PostScreen} />
-      <Tab.Screen name="Notifications" component={NotificationsScreen} />
+      <Tab.Screen name="Ranking" component={LeaderboardScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

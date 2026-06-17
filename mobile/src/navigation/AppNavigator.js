@@ -7,6 +7,8 @@ import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import DoubtDetailScreen from '../screens/DoubtDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import SearchScreen from '../screens/SearchScreen';
 import MainTabs from './MainTabs';
 import SplashTransition from '../components/SplashTransition';
 
@@ -22,7 +24,6 @@ export default function AppNavigator() {
     );
   }
 
-  // Verificar si el perfil está incompleto (carrera no especificada)
   const isProfileIncomplete = user && (!user.career || user.career === 'Sin especificar');
 
   return (
@@ -57,6 +58,16 @@ export default function AppNavigator() {
               <Stack.Screen
                 name="ChatRoom"
                 component={ChatScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="Search"
+                component={SearchScreen}
                 options={{ animation: 'slide_from_right' }}
               />
             </>

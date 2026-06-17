@@ -69,20 +69,36 @@ export default function HomeScreen() {
               <Text style={styles.headerSub}>Red Colaborativa Estudiantil</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.avatarRing}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('ProfileTab')}
-          >
-            {user?.photo_url ? (
-              <Image source={{ uri: user.photo_url }} style={styles.avatarImg} />
-            ) : (
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarLetter}>{userInitial}</Text>
-              </View>
-            )}
-            <View style={styles.avatarOnline} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Search')}
+            >
+              <Ionicons name="search-outline" size={20} color={COLORS.textLight} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <Ionicons name="notifications-outline" size={20} color={COLORS.textLight} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.avatarRing}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('ProfileTab')}
+            >
+              {user?.photo_url ? (
+                <Image source={{ uri: user.photo_url }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarLetter}>{userInitial}</Text>
+                </View>
+              )}
+              <View style={styles.avatarOnline} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Greeting */}
@@ -226,6 +242,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: RADIUS.xl, borderBottomRightRadius: RADIUS.xl,
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  headerIconBtn: {
+    width: 36, height: 36, borderRadius: RADIUS.full,
+    backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   logoBox: {
     width: 36, height: 36, borderRadius: RADIUS.xs, backgroundColor: COLORS.accent,

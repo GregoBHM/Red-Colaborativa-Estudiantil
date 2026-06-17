@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import case
+from sqlalchemy import case, or_
 from sqlalchemy.sql import func
 from typing import List, Optional
+from pydantic import BaseModel
 from database import get_db
 from models.doubt import Doubt
 from models.user import User
@@ -12,7 +13,13 @@ from models.rating import Rating
 from schemas.doubt import DoubtCreate, DoubtResponse, DoubtResolve, SubjectResponse
 from services.xp_service import award_xp_for_help
 from services.moderation_service import is_monetization_attempt
+from services.push_service import create_and_push_notification
 from ws_manager import manager
+
+
+class DoubtUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
 
 router = APIRouter(prefix="/doubts", tags=["Doubts"])
 
@@ -181,7 +188,20 @@ async def resolve_doubt(
     db.commit()
 
     updated_mentor = award_xp_for_help(db, payload.resolver_id, payload.stars)
-    await manager.broadcast("doubt_resolved", {"doubt_id": doubt_id, "resolver_id": payload.resolver_id})
+    await manager.broadcast(
+        "doubt_resolved",
+        {"doubt_id": doubt_id, "resolver_id": payload.resolver_id})
+
+    mentor = db.query(User).filter(
+        User.id == payload.resolver_id).first()
+    mentor_name = mentor.display_name if mentor else "Un mentor"
+    create_and_push_notification(
+        db, doubt.author_id,
+        title="Tu duda fue resuelta",
+        body=f"{mentor_name} resolvio tu duda: {doubt.title[:60]}",
+        notification_type="resolved",
+        reference_id=doubt_id,
+    )
 
     return {
         "message": "Duda resuelta exitosamente",
@@ -222,3 +242,70 @@ async def delete_doubt(
 @router.get("/subjects", response_model=List[SubjectResponse])
 async def get_subjects(db: Session = Depends(get_db)):
     return db.query(Subject).order_by(Subject.name).all()
+
+
+@router.get("/search", response_model=List[DoubtResponse])
+async def search_doubts(
+        q: str = "",
+        subject_id: Optional[int] = None,
+        status_filter: Optional[str] = None,
+        sort: Optional[str] = "recent",
+        skip: int = 0,
+        limit: int = 20,
+        db: Session = Depends(get_db)):
+    query = db.query(Doubt).filter(Doubt.is_deleted.is_(False))
+
+    if q.strip():
+        search_term = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Doubt.title.ilike(search_term),
+                Doubt.description.ilike(search_term),
+            )
+        )
+    if subject_id:
+        query = query.filter(Doubt.subject_id == subject_id)
+    if status_filter:
+        query = query.filter(Doubt.status == status_filter)
+
+    if sort == "likes":
+        query = query.order_by(Doubt.likes_count.desc())
+    else:
+        query = query.order_by(Doubt.created_at.desc())
+
+    doubts = query.offset(skip).limit(limit).all()
+    return [_build_doubt_response(db, d) for d in doubts]
+
+
+@router.patch("/{doubt_id}")
+async def edit_doubt(
+        doubt_id: int,
+        payload: DoubtUpdate,
+        user_id: int = None,
+        db: Session = Depends(get_db)):
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id es requerido")
+
+    doubt = db.query(Doubt).filter(Doubt.id == doubt_id).first()
+    if not doubt:
+        raise HTTPException(status_code=404, detail="Duda no encontrada")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if doubt.author_id != user_id and (not user or user.role != "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para editar esta duda")
+
+    if doubt.status == "resolved":
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede editar una duda resuelta")
+
+    if payload.title is not None:
+        doubt.title = payload.title.strip()
+    if payload.description is not None:
+        doubt.description = payload.description.strip()
+
+    db.commit()
+    db.refresh(doubt)
+    return _build_doubt_response(db, doubt)

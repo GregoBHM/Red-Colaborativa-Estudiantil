@@ -10,10 +10,14 @@ export const API = {
     ME: `${API_BASE_URL}/api/v1/auth/me`,
     DOUBTS_FEED: `${API_BASE_URL}/api/v1/doubts/feed`,
     DOUBTS_CREATE: `${API_BASE_URL}/api/v1/doubts`,
+    DOUBTS_SEARCH: `${API_BASE_URL}/api/v1/doubts/search`,
     SUBJECTS: `${API_BASE_URL}/api/v1/doubts/subjects`,
+    LEADERBOARD: `${API_BASE_URL}/api/v1/users/leaderboard`,
+    REPORTS: `${API_BASE_URL}/api/v1/reports`,
     USER_PROFILE: (id) => `${API_BASE_URL}/api/v1/users/${id}`,
     USER_STATS: (id) => `${API_BASE_URL}/api/v1/users/${id}/stats`,
     DOUBT_RESOLVE: (id) => `${API_BASE_URL}/api/v1/doubts/${id}/resolve`,
+    DOUBT_EDIT: (id) => `${API_BASE_URL}/api/v1/doubts/${id}`,
   },
 };
 

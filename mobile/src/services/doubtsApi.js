@@ -74,3 +74,30 @@ export async function toggleLikeDoubt(doubtId, userId) {
   }
   return await response.json();
 }
+
+export async function searchDoubts(query, filters = {}) {
+  const params = [`q=${encodeURIComponent(query)}`];
+  if (filters.subjectId) params.push(`subject_id=${filters.subjectId}`);
+  if (filters.status) params.push(`status_filter=${filters.status}`);
+  if (filters.sort) params.push(`sort=${filters.sort}`);
+  const url = `${API.ENDPOINTS.DOUBTS_SEARCH}?${params.join('&')}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Error al buscar');
+  }
+  return await response.json();
+}
+
+export async function editDoubt(doubtId, userId, data) {
+  const response = await fetch(`${API.ENDPOINTS.DOUBT_EDIT(doubtId)}?user_id=${userId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Error al editar la duda');
+  }
+  return await response.json();
+}

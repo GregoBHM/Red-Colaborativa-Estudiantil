@@ -6,10 +6,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { API } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 
 export default function AdminDashboardScreen({ navigation }) {
+  const { user } = useAuth();
+  const adminId = user?.id;
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,8 +24,8 @@ export default function AdminDashboardScreen({ navigation }) {
   const loadData = useCallback(async () => {
     try {
       const [statsRes, usersRes] = await Promise.all([
-        fetch(`${API.BASE_URL}/api/v1/admin/stats`),
-        fetch(`${API.BASE_URL}/api/v1/admin/users`),
+        fetch(`${API.BASE_URL}/api/v1/admin/stats?admin_id=${adminId}`),
+        fetch(`${API.BASE_URL}/api/v1/admin/users?admin_id=${adminId}`),
       ]);
       const statsData = await statsRes.json();
       const usersData = await usersRes.json();
@@ -40,7 +43,7 @@ export default function AdminDashboardScreen({ navigation }) {
 
   const toggleUserActive = async (userId) => {
     try {
-      await fetch(`${API.BASE_URL}/api/v1/admin/users/${userId}/toggle-active`, { method: 'PATCH' });
+      await fetch(`${API.BASE_URL}/api/v1/admin/users/${userId}/toggle-active?admin_id=${adminId}`, { method: 'PATCH' });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: !u.is_active } : u));
     } catch (err) {
       Alert.alert('Error', 'No se pudo cambiar el estado del usuario.');
@@ -49,7 +52,7 @@ export default function AdminDashboardScreen({ navigation }) {
 
   const toggleUserRole = async (userId) => {
     try {
-      const res = await fetch(`${API.BASE_URL}/api/v1/admin/users/${userId}/toggle-role`, { method: 'PATCH' });
+      const res = await fetch(`${API.BASE_URL}/api/v1/admin/users/${userId}/toggle-role?admin_id=${adminId}`, { method: 'PATCH' });
       const data = await res.json();
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: data.role } : u));
       Alert.alert('Rol actualizado', data.message);
@@ -65,7 +68,7 @@ export default function AdminDashboardScreen({ navigation }) {
     }
     setSending(true);
     try {
-      const res = await fetch(`${API.BASE_URL}/api/v1/admin/announcements`, {
+      const res = await fetch(`${API.BASE_URL}/api/v1/admin/announcements?admin_id=${adminId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(announcement),
