@@ -21,7 +21,6 @@ from models.career import Career
 from models.university_student import UniversityStudent
 import asyncio
 import json
-import models
 
 settings = get_settings()
 
@@ -94,7 +93,8 @@ async def get_students(
 ):
     query = db.query(UniversityStudent)
     if career_name:
-        query = query.join(Career).filter(Career.name.ilike(f"%{career_name}%"))
+        query = query.join(Career).filter(
+            Career.name.ilike(f"%{career_name}%"))
     students = query.limit(limit).all()
     return {
         "total_mostrados": len(students),
@@ -155,4 +155,8 @@ app.mount("/", inner_app)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host=settings.HOST, port=settings.PORT, reload=True)
+    uvicorn.run(
+        "main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=True)

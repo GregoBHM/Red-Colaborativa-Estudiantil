@@ -21,7 +21,10 @@ async def get_user_profile(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-async def update_user_profile(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)):
+async def update_user_profile(
+        user_id: int,
+        payload: UserUpdate,
+        db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -55,7 +58,10 @@ async def get_user_stats(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{user_id}/fcm-token")
-async def register_fcm_token(user_id: int, payload: FCMTokenPayload, db: Session = Depends(get_db)):
+async def register_fcm_token(
+        user_id: int,
+        payload: FCMTokenPayload,
+        db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

@@ -11,6 +11,7 @@ from models.comment import Comment
 from models.rating import Rating
 from schemas.doubt import DoubtCreate, DoubtResponse, DoubtResolve, SubjectResponse
 from services.xp_service import award_xp_for_help
+from services.moderation_service import is_monetization_attempt
 from ws_manager import manager
 
 router = APIRouter(prefix="/doubts", tags=["Doubts"])
@@ -18,14 +19,18 @@ router = APIRouter(prefix="/doubts", tags=["Doubts"])
 
 def _build_doubt_response(db: Session, doubt: Doubt) -> DoubtResponse:
     author = db.query(User).filter(User.id == doubt.author_id).first()
-    subject = db.query(Subject).filter(Subject.id == doubt.subject_id).first() if doubt.subject_id else None
-    comments_count = db.query(Comment).filter(Comment.doubt_id == doubt.id).count()
+    subject = db.query(Subject).filter(
+        Subject.id == doubt.subject_id).first() if doubt.subject_id else None
+    comments_count = db.query(Comment).filter(
+        Comment.doubt_id == doubt.id).count()
 
     return DoubtResponse(
         id=doubt.id,
         author_id=doubt.author_id,
-        author_name="Anónimo" if doubt.is_anonymous else (author.display_name if author else "Desconocido"),
-        author_photo=None if doubt.is_anonymous else (author.photo_url if author else None),
+        author_name="Anónimo" if doubt.is_anonymous else (
+            author.display_name if author else "Desconocido"),
+        author_photo=None if doubt.is_anonymous else (
+            author.photo_url if author else None),
         author_level=author.level if author else None,
         subject_id=doubt.subject_id,
         subject_name=subject.name if subject else None,
@@ -68,11 +73,13 @@ async def get_feed(
             db.query(Doubt)
             .outerjoin(Subject, Doubt.subject_id == Subject.id)
             .outerjoin(User, Doubt.author_id == User.id)
-            .filter(Doubt.is_deleted == False)
+            .filter(Doubt.is_deleted.is_(False))
             .order_by(priority_col.asc(), Doubt.created_at.desc())
         )
     else:
-        query = db.query(Doubt).filter(Doubt.is_deleted == False).order_by(Doubt.created_at.desc())
+        query = db.query(Doubt).filter(
+            Doubt.is_deleted.is_(False)
+        ).order_by(Doubt.created_at.desc())
 
     if subject_id:
         query = query.filter(Doubt.subject_id == subject_id)
@@ -83,10 +90,22 @@ async def get_feed(
     return [_build_doubt_response(db, d) for d in doubts]
 
 
-@router.post("/", response_model=DoubtResponse, status_code=status.HTTP_201_CREATED)
-async def create_doubt(payload: DoubtCreate, author_id: int = None, db: Session = Depends(get_db)):
+@router.post("/", response_model=DoubtResponse,
+             status_code=status.HTTP_201_CREATED)
+async def create_doubt(
+        payload: DoubtCreate,
+        author_id: int = None,
+        db: Session = Depends(get_db)):
     if not author_id:
         raise HTTPException(status_code=400, detail="author_id es requerido")
+
+    full_text = f"{payload.title} {payload.description or ''}".strip()
+    if await is_monetization_attempt(text=full_text, image_url=payload.image_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu publicación fue bloqueada porque parece "
+                   "contener cobros o venta de tareas. La plataforma es gratuita.",
+        )
 
     doubt = Doubt(
         author_id=author_id,
@@ -101,15 +120,15 @@ async def create_doubt(payload: DoubtCreate, author_id: int = None, db: Session 
     db.refresh(doubt)
 
     response = _build_doubt_response(db, doubt)
-
-    # Emitir evento en tiempo real
     await manager.broadcast("new_doubt", response.model_dump())
-
     return response
 
 
 @router.post("/{doubt_id}/like")
-async def toggle_like_doubt(doubt_id: int, user_id: int = None, db: Session = Depends(get_db)):
+async def toggle_like_doubt(
+        doubt_id: int,
+        user_id: int = None,
+        db: Session = Depends(get_db)):
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id es requerido")
 
@@ -120,14 +139,12 @@ async def toggle_like_doubt(doubt_id: int, user_id: int = None, db: Session = De
     liked_by = list(doubt.liked_by or [])
 
     if user_id in liked_by:
-        # Unlike
         liked_by.remove(user_id)
         doubt.liked_by = liked_by
         doubt.likes_count = len(liked_by)
         db.commit()
         return {"action": "unliked", "likes_count": doubt.likes_count}
     else:
-        # Like
         liked_by.append(user_id)
         doubt.liked_by = liked_by
         doubt.likes_count = len(liked_by)
@@ -136,12 +153,17 @@ async def toggle_like_doubt(doubt_id: int, user_id: int = None, db: Session = De
 
 
 @router.patch("/{doubt_id}/resolve")
-async def resolve_doubt(doubt_id: int, payload: DoubtResolve, db: Session = Depends(get_db)):
+async def resolve_doubt(
+        doubt_id: int,
+        payload: DoubtResolve,
+        db: Session = Depends(get_db)):
     doubt = db.query(Doubt).filter(Doubt.id == doubt_id).first()
     if not doubt:
         raise HTTPException(status_code=404, detail="Duda no encontrada")
     if doubt.status == "resolved":
-        raise HTTPException(status_code=400, detail="Esta duda ya fue resuelta")
+        raise HTTPException(
+            status_code=400,
+            detail="Esta duda ya fue resuelta")
 
     doubt.status = "resolved"
     doubt.resolved_by = payload.resolver_id
@@ -159,8 +181,6 @@ async def resolve_doubt(doubt_id: int, payload: DoubtResolve, db: Session = Depe
     db.commit()
 
     updated_mentor = award_xp_for_help(db, payload.resolver_id, payload.stars)
-
-    # Emitir evento en tiempo real
     await manager.broadcast("doubt_resolved", {"doubt_id": doubt_id, "resolver_id": payload.resolver_id})
 
     return {
@@ -172,7 +192,10 @@ async def resolve_doubt(doubt_id: int, payload: DoubtResolve, db: Session = Depe
 
 
 @router.delete("/{doubt_id}")
-async def delete_doubt(doubt_id: int, user_id: int = None, db: Session = Depends(get_db)):
+async def delete_doubt(
+        doubt_id: int,
+        user_id: int = None,
+        db: Session = Depends(get_db)):
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id es requerido")
 
@@ -185,14 +208,14 @@ async def delete_doubt(doubt_id: int, user_id: int = None, db: Session = Depends
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     if doubt.author_id != user_id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="No tienes permiso para eliminar esta duda")
+        raise HTTPException(
+            status_code=403,
+            detail="No tienes permiso para eliminar esta duda")
 
-    # Soft delete — preserve chat history
     doubt.is_deleted = True
     db.commit()
 
     await manager.broadcast("doubt_deleted", {"doubt_id": doubt_id})
-
     return {"message": "Duda eliminada exitosamente"}
 
 

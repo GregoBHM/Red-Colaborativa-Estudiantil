@@ -11,7 +11,11 @@ settings = get_settings()
 part1 = os.getenv("FIREBASE_B64_1", "")
 part2 = os.getenv("FIREBASE_B64_2", "")
 
-_firebase_env = (part1 + part2).strip() or os.getenv("FIREBASE_CREDENTIALS_JSON", "").strip()
+_firebase_env = (
+    part1 +
+    part2).strip() or os.getenv(
+        "FIREBASE_CREDENTIALS_JSON",
+    "").strip()
 
 if _firebase_env:
     if _firebase_env.startswith("{"):
@@ -19,7 +23,8 @@ if _firebase_env:
     else:
         b64_clean = re.sub(r'[^a-zA-Z0-9+/=]', '', _firebase_env)
         b64_clean += "=" * ((4 - len(b64_clean) % 4) % 4)
-        cred = credentials.Certificate(json.loads(base64.b64decode(b64_clean).decode("utf-8")))
+        cred = credentials.Certificate(json.loads(
+            base64.b64decode(b64_clean).decode("utf-8")))
 else:
     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
 

@@ -1,5 +1,5 @@
 from fastapi import WebSocket
-from typing import Dict, List, Set
+from typing import Dict, Set
 from datetime import datetime, timezone
 import json
 

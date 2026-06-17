@@ -44,16 +44,21 @@ async def get_user_notifications(user_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{notification_id}/read")
 async def mark_as_read(notification_id: int, db: Session = Depends(get_db)):
-    notif = db.query(Notification).filter(Notification.id == notification_id).first()
+    notif = db.query(Notification).filter(
+        Notification.id == notification_id).first()
     if not notif:
-        raise HTTPException(status_code=404, detail="Notificación no encontrada")
+        raise HTTPException(
+            status_code=404,
+            detail="Notificación no encontrada")
     notif.is_read = True
     db.commit()
     return {"message": "Marcada como leída"}
 
 
 @router.post("/", response_model=NotificationOut)
-async def create_notification(payload: NotificationCreate, db: Session = Depends(get_db)):
+async def create_notification(
+        payload: NotificationCreate,
+        db: Session = Depends(get_db)):
     notif = Notification(
         user_id=payload.user_id,
         title=payload.title,

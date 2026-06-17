@@ -105,15 +105,13 @@ def create_meet_event(
 
     try:
         created_event = (
-            service.events()
-            .insert(
+            service.events() .insert(
                 calendarId=calendar_id,
                 body=event_body,
                 conferenceDataVersion=1,
-                sendUpdates="all" if (attendees and delegate_email) else "none",
-            )
-            .execute()
-        )
+                sendUpdates="all" if (
+                    attendees and delegate_email) else "none",
+            ) .execute())
         meet_link = created_event.get("hangoutLink") or created_event.get(
             "conferenceData", {}
         ).get("entryPoints", [{}])[0].get("uri", "")
@@ -150,7 +148,10 @@ def create_meet_event(
             "meet_link": meet_link,
             "html_link": html_link,
             "start": start_dt.isoformat(),
-            "end": (start_dt + timedelta(minutes=duration_minutes)).isoformat(),
+            "end": (
+                start_dt +
+                timedelta(
+                    minutes=duration_minutes)).isoformat(),
         }
 
     return {

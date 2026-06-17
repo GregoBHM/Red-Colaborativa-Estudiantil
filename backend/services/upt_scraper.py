@@ -7,26 +7,26 @@ from models.career import Career
 from models.university_student import UniversityStudent
 
 UPT_CAREERS = [
-    {"name": "Ingeniería Civil",                                  "faculty": "FAING",   "upt_id": 314047000},
-    {"name": "Ingeniería de Sistemas",                            "faculty": "FAING",   "upt_id": 314048000},
-    {"name": "Ingeniería Electrónica",                            "faculty": "FAING",   "upt_id": 314049000},
-    {"name": "Ingeniería Agroindustrial",                         "faculty": "FAING",   "upt_id": 314088000},
-    {"name": "Ingeniería Ambiental",                              "faculty": "FAING",   "upt_id": 314061000},
-    {"name": "Ingeniería Industrial",                             "faculty": "FAING",   "upt_id": 314062000},
-    {"name": "Educación",                                         "faculty": "FAEDCOH", "upt_id": 313042100},
-    {"name": "Ciencias de la Comunicación",                       "faculty": "FAEDCOH", "upt_id": 313046000},
-    {"name": "Psicología",                                        "faculty": "FAEDCOH", "upt_id": 313048001},
-    {"name": "Derecho",                                           "faculty": "FADE",    "upt_id": 312041000},
-    {"name": "Medicina Humana",                                   "faculty": "FACSA",   "upt_id": 315050000},
-    {"name": "Odontología",                                       "faculty": "FACSA",   "upt_id": 315051000},
-    {"name": "Tecnología Médica",                                 "faculty": "FACSA",   "upt_id": None},
-    {"name": "Ciencias Contables y Financieras",                  "faculty": "FACEM",   "upt_id": 316054000},
-    {"name": "Ingeniería Comercial",                              "faculty": "FACEM",   "upt_id": 316053000},
-    {"name": "Economía y Microfinanzas",                          "faculty": "FACEM",   "upt_id": 316059000},
-    {"name": "Administración",                                    "faculty": "FACEM",   "upt_id": None},
-    {"name": "Administración Turístico-Hotelera",                 "faculty": "FACEM",   "upt_id": 316052000},
-    {"name": "Administración de Negocios Internacionales",        "faculty": "FACEM",   "upt_id": 316055000},
-    {"name": "Arquitectura",                                      "faculty": "FAU",     "upt_id": 317055000},
+    {"name": "Ingeniería Civil", "faculty": "FAING", "upt_id": 314047000},
+    {"name": "Ingeniería de Sistemas", "faculty": "FAING", "upt_id": 314048000},
+    {"name": "Ingeniería Electrónica", "faculty": "FAING", "upt_id": 314049000},
+    {"name": "Ingeniería Agroindustrial", "faculty": "FAING", "upt_id": 314088000},
+    {"name": "Ingeniería Ambiental", "faculty": "FAING", "upt_id": 314061000},
+    {"name": "Ingeniería Industrial", "faculty": "FAING", "upt_id": 314062000},
+    {"name": "Educación", "faculty": "FAEDCOH", "upt_id": 313042100},
+    {"name": "Ciencias de la Comunicación", "faculty": "FAEDCOH", "upt_id": 313046000},
+    {"name": "Psicología", "faculty": "FAEDCOH", "upt_id": 313048001},
+    {"name": "Derecho", "faculty": "FADE", "upt_id": 312041000},
+    {"name": "Medicina Humana", "faculty": "FACSA", "upt_id": 315050000},
+    {"name": "Odontología", "faculty": "FACSA", "upt_id": 315051000},
+    {"name": "Tecnología Médica", "faculty": "FACSA", "upt_id": None},
+    {"name": "Ciencias Contables y Financieras", "faculty": "FACEM", "upt_id": 316054000},
+    {"name": "Ingeniería Comercial", "faculty": "FACEM", "upt_id": 316053000},
+    {"name": "Economía y Microfinanzas", "faculty": "FACEM", "upt_id": 316059000},
+    {"name": "Administración", "faculty": "FACEM", "upt_id": None},
+    {"name": "Administración Turístico-Hotelera", "faculty": "FACEM", "upt_id": 316052000},
+    {"name": "Administración de Negocios Internacionales", "faculty": "FACEM", "upt_id": 316055000},
+    {"name": "Arquitectura", "faculty": "FAU", "upt_id": 317055000},
 ]
 
 
@@ -66,7 +66,7 @@ def roman_to_int(s: str) -> int:
     s = s.replace("CICLO", "").replace("-", "").strip()
     if s.isdigit():
         return int(s)
-    
+
     roman = {'I': 1, 'V': 5, 'X': 10}
     res = 0
     i = 0
@@ -91,7 +91,8 @@ async def sync_upt_data():
     db: Session = SessionLocal()
     try:
         for career_data in UPT_CAREERS:
-            existing = db.query(Career).filter(Career.name == career_data["name"]).first()
+            existing = db.query(Career).filter(
+                Career.name == career_data["name"]).first()
             if not existing:
                 db.add(Career(
                     name=career_data["name"],
@@ -104,7 +105,7 @@ async def sync_upt_data():
                     existing.upt_id = career_data["upt_id"]
         db.commit()
 
-        for career in db.query(Career).filter(Career.upt_id != None).all():
+        for career in db.query(Career).filter(Career.upt_id is not None).all():
             students = await fetch_students_for_career(career.upt_id)
             if not students:
                 continue
@@ -127,7 +128,11 @@ async def sync_upt_data():
                         existing_map[name].cycle = cycle
                         update_count += 1
                 else:
-                    db.add(UniversityStudent(full_name=name, cycle=cycle, career_id=career.id))
+                    db.add(
+                        UniversityStudent(
+                            full_name=name,
+                            cycle=cycle,
+                            career_id=career.id))
                     new_count += 1
 
             db.commit()

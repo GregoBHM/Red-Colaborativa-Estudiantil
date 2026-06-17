@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from schemas.user import TokenPayload, UserResponse
-from firebase_config import verify_firebase_token, validate_email_domain
+from firebase_config import verify_firebase_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

@@ -8,8 +8,19 @@ class Comment(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    doubt_id = Column(Integer, ForeignKey("doubts.id", ondelete="CASCADE"), nullable=False, index=True)
-    author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doubt_id = Column(
+        Integer,
+        ForeignKey(
+            "doubts.id",
+            ondelete="CASCADE"),
+        nullable=False,
+        index=True)
+    author_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE"),
+        nullable=False)
     content = Column(Text, nullable=False)
     image_url = Column(String, nullable=True)
     likes_count = Column(Integer, default=0, nullable=False)

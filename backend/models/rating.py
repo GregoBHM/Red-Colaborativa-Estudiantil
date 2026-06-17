@@ -8,9 +8,24 @@ class Rating(Base):
     __tablename__ = "ratings"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    doubt_id = Column(Integer, ForeignKey("doubts.id", ondelete="CASCADE"), nullable=False)
-    reviewer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    mentor_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doubt_id = Column(
+        Integer,
+        ForeignKey(
+            "doubts.id",
+            ondelete="CASCADE"),
+        nullable=False)
+    reviewer_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE"),
+        nullable=False)
+    mentor_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE"),
+        nullable=False)
     stars = Column(Integer, nullable=False)
     comment = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
