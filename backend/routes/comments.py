@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -8,6 +8,7 @@ from models.comment import Comment
 from models.doubt import Doubt
 from models.user import User
 from services.push_service import create_and_push_notification
+from services.moderation_service import is_monetization_attempt
 
 router = APIRouter(prefix="/doubts", tags=["Comments"])
 
@@ -32,38 +33,57 @@ class CommentOut(BaseModel):
 
 
 @router.get("/{doubt_id}/comments", response_model=List[CommentOut])
-async def get_comments(doubt_id: int, db: Session = Depends(get_db)):
+async def get_comments(
+    doubt_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+):
+    # Usamos joinedload para traer autor en UNA sola consulta (evita el N+1)
     comments = (
         db.query(Comment)
+        .options(joinedload(Comment.author))
         .filter(Comment.doubt_id == doubt_id)
         .order_by(Comment.created_at.asc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
-    result = []
-    for c in comments:
-        author = db.query(User).filter(User.id == c.author_id).first()
-        result.append(CommentOut(
+    return [
+        CommentOut(
             id=c.id,
             doubt_id=c.doubt_id,
             author_id=c.author_id,
-            author_name=author.display_name if author else "Desconocido",
-            author_photo=author.photo_url if author else None,
-            author_level=author.level if author else None,
+            author_name=c.author.display_name if c.author else "Desconocido",
+            author_photo=c.author.photo_url if c.author else None,
+            author_level=c.author.level if c.author else None,
             content=c.content,
             image_url=c.image_url,
             likes_count=c.likes_count or 0,
             liked_by=c.liked_by or [],
             created_at=c.created_at,
-        ))
-    return result
+        )
+        for c in comments
+    ]
 
 
 @router.post("/{doubt_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
-async def create_comment(doubt_id: int, payload: CommentCreate, author_id: int = None, db: Session = Depends(get_db)):
+async def create_comment(
+    doubt_id: int,
+    payload: CommentCreate,
+    author_id: int = None,
+    db: Session = Depends(get_db),
+):
     if not author_id:
         raise HTTPException(status_code=400, detail="author_id es requerido")
     if not payload.content.strip() and not payload.image_url:
         raise HTTPException(status_code=400, detail="El comentario no puede estar vacío")
+
+    if await is_monetization_attempt(text=payload.content, image_url=payload.image_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu comentario fue bloqueado porque parece contener cobros o venta de tareas. La plataforma es gratuita.",
+        )
 
     comment = Comment(
         doubt_id=doubt_id,
@@ -75,6 +95,7 @@ async def create_comment(doubt_id: int, payload: CommentCreate, author_id: int =
     db.commit()
     db.refresh(comment)
 
+    # Cargar el autor en la misma sesión
     author = db.query(User).filter(User.id == author_id).first()
 
     # Push notification al autor de la duda
