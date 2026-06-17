@@ -8,6 +8,7 @@ from models.comment import Comment
 from models.doubt import Doubt
 from models.user import User
 from services.push_service import create_and_push_notification
+from services.moderation_service import is_monetization_attempt
 
 router = APIRouter(prefix="/doubts", tags=["Comments"])
 
@@ -77,6 +78,12 @@ async def create_comment(
         raise HTTPException(status_code=400, detail="author_id es requerido")
     if not payload.content.strip() and not payload.image_url:
         raise HTTPException(status_code=400, detail="El comentario no puede estar vacío")
+
+    if await is_monetization_attempt(text=payload.content, image_url=payload.image_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu comentario fue bloqueado porque parece contener cobros o venta de tareas. La plataforma es gratuita.",
+        )
 
     comment = Comment(
         doubt_id=doubt_id,

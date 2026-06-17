@@ -6,28 +6,6 @@ from database import SessionLocal
 from models.career import Career
 from models.university_student import UniversityStudent
 
-UPT_CAREER_DEPE = {
-    "Ingeniería Civil": 314047000,
-    "Ingeniería de Sistemas": 314048000,
-    "Ingeniería Electrónica": 314049000,
-    "Ingeniería Agroindustrial": 314088000,
-    "Ingeniería Ambiental": 314061000,
-    "Ingeniería Industrial": 314062000,
-    "Educación": 313042100,
-    "Ciencias de la Comunicación": 313046000,
-    "Psicología": 313048001,
-    "Derecho": 312041000,
-    "Medicina Humana": 315050000,
-    "Odontología": 315051000,
-    "Ciencias Contables y Financieras": 316054000,
-    "Ingeniería Comercial": 316053000,
-    "Economía": 316059000,
-    "Administración Turístico-Hotelera": 316052000,
-    "Administración de Negocios Internacionales": 316055000,
-    "Arquitectura": 317055000,
-}
-
-
 async def fetch_students_for_career(depe_id: int) -> list:
     url = f"https://www.upt.edu.pe/upt/web/modulos/alumno.php?depe={depe_id}"
 
@@ -88,12 +66,6 @@ async def sync_upt_data():
     print("Iniciando sincronización de alumnos de la UPT...")
     db: Session = SessionLocal()
     try:
-        for career_name, upt_code in UPT_CAREER_DEPE.items():
-            existing = db.query(Career).filter(Career.name == career_name).first()
-            if not existing:
-                db.add(Career(name=career_name, faculty="No especificada", upt_id=upt_code))
-            elif not existing.upt_id:
-                existing.upt_id = upt_code
         db.commit()
 
         for career in db.query(Career).filter(Career.upt_id != None).all():

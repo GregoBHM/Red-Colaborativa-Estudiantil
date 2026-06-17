@@ -11,6 +11,7 @@ from models.comment import Comment
 from models.rating import Rating
 from schemas.doubt import DoubtCreate, DoubtResponse, DoubtResolve, SubjectResponse
 from services.xp_service import award_xp_for_help
+from services.moderation_service import is_monetization_attempt
 from ws_manager import manager
 
 router = APIRouter(prefix="/doubts", tags=["Doubts"])
@@ -87,6 +88,13 @@ async def get_feed(
 async def create_doubt(payload: DoubtCreate, author_id: int = None, db: Session = Depends(get_db)):
     if not author_id:
         raise HTTPException(status_code=400, detail="author_id es requerido")
+
+    full_text = f"{payload.title} {payload.description or ''}".strip()
+    if await is_monetization_attempt(text=full_text, image_url=payload.image_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu publicación fue bloqueada porque parece contener cobros o venta de tareas. La plataforma es gratuita.",
+        )
 
     doubt = Doubt(
         author_id=author_id,

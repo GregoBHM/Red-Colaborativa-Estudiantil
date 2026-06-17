@@ -25,6 +25,7 @@ export default function LoginScreen() {
     setIsLoadingGoogle(true);
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      try { await GoogleSignin.signOut(); } catch (_) {}
       const userInfo = await GoogleSignin.signIn();
       const idToken = userInfo.data?.idToken || userInfo.idToken;
       if (!idToken) throw new Error('No se recibió token de Google');
@@ -103,8 +104,8 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <View style={styles.domainNotice}>
-          <Ionicons name="lock-open-outline" size={14} color={COLORS.success} style={{ marginRight: 6 }} />
-          <Text style={styles.domainText}>Acceso con cualquier cuenta Google</Text>
+          <Ionicons name="lock-closed-outline" size={14} color={COLORS.primary} style={{ marginRight: 6 }} />
+          <Text style={styles.domainText}>Solo para miembros de la UPT</Text>
         </View>
 
         <Text style={styles.footerText}>
@@ -165,7 +166,7 @@ const styles = StyleSheet.create({
   domainNotice: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: SPACING.lg,
   },
-  domainText: { fontSize: FONTS.sizes.sm, color: COLORS.success, fontWeight: '600' },
+  domainText: { fontSize: FONTS.sizes.sm, color: COLORS.primary, fontWeight: '600' },
   footerText: {
     fontSize: FONTS.sizes.xs, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.xl,
   },

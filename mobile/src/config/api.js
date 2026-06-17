@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://alda-upt.sytes.net:8300';
+const API_BASE_URL = 'https://api.sparkingcraft.com/movilesii';
 
 // Exportación directa para uso en servicios como WebSocket
 export const API_URL = API_BASE_URL;

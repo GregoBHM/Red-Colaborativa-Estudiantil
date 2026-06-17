@@ -15,19 +15,6 @@ from services.google_meet_service import create_meet_event
 from ws_manager import manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
-
-BANNED_WORDS = [
-    "pago", "dinero", "cobro", "precio", "transferencia",
-    "yape", "plin", "bitcoin", "cuenta", "deposito",
-    "cobra", "costo", "tarifa", "comisión", "negocio",
-]
-
-
-def check_flagged(content: str) -> bool:
-    lower = content.lower()
-    return any(word in lower for word in BANNED_WORDS)
-
-
 class ChatRoomCreate(BaseModel):
     doubt_id: int
     mentor_id: int
@@ -172,13 +159,19 @@ async def send_message(room_id: int, payload: MessageCreate, db: Session = Depen
     if payload.sender_id not in (room.mentor_id, room.student_id):
         raise HTTPException(status_code=403, detail="No eres parte de esta sala")
 
-    flagged = check_flagged(payload.content)
+    flagged = await is_monetization_attempt(text=payload.content)
+
+    if flagged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu mensaje fue bloqueado porque parece contener una oferta de cobro. La plataforma es 100% gratuita.",
+        )
 
     message = ChatMessage(
         chat_room_id=room_id,
         sender_id=payload.sender_id,
         content=payload.content.strip(),
-        is_flagged=flagged,
+        is_flagged=False,
     )
     db.add(message)
     db.commit()

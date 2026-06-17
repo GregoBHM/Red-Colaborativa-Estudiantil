@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ROOT_PATH: str = ""
     GOOGLE_SERVICE_ACCOUNT_JSON: str = "./google-service-account.json"
     GOOGLE_CALENDAR_ID: str = "primary"
+    GEMINI_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
