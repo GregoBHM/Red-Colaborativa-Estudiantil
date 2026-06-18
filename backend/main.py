@@ -12,8 +12,8 @@ from routes.verification import router as verification_router
 from routes.reports import router as reports_router
 from routes.labs import router as labs_router
 from routes.bookmarks import router as bookmarks_router
-from models.laboratory import Laboratory
-from models.bookmark import Bookmark
+from models.laboratory import Laboratory  # noqa: F401
+from models.bookmark import Bookmark  # noqa: F401
 from services.upt_scraper import sync_upt_data
 from config import get_settings
 from ws_manager import manager

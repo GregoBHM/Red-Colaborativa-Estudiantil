@@ -35,7 +35,7 @@ class LaboratoryOut(BaseModel):
 
 @router.get("/free", response_model=List[LaboratoryOut])
 async def get_free_labs(db: Session = Depends(get_db)):
-    return db.query(Laboratory).filter(Laboratory.is_available == True).order_by(Laboratory.name).all()
+    return db.query(Laboratory).filter(Laboratory.is_available.is_(True)).order_by(Laboratory.name).all()
 
 
 @router.get("/", response_model=List[LaboratoryOut])
