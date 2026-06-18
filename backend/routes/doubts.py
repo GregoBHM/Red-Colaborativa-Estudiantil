@@ -21,6 +21,7 @@ class DoubtUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
 
+
 router = APIRouter(prefix="/doubts", tags=["Doubts"])
 
 
@@ -34,10 +35,8 @@ def _build_doubt_response(db: Session, doubt: Doubt) -> DoubtResponse:
     return DoubtResponse(
         id=doubt.id,
         author_id=doubt.author_id,
-        author_name="Anónimo" if doubt.is_anonymous else (
-            author.display_name if author else "Desconocido"),
-        author_photo=None if doubt.is_anonymous else (
-            author.photo_url if author else None),
+        author_name=author.display_name if author else "Desconocido",
+        author_photo=author.photo_url if author else None,
         author_level=author.level if author else None,
         subject_id=doubt.subject_id,
         subject_name=subject.name if subject else None,
@@ -45,7 +44,7 @@ def _build_doubt_response(db: Session, doubt: Doubt) -> DoubtResponse:
         description=doubt.description,
         image_url=doubt.image_url,
         status=doubt.status,
-        is_anonymous=doubt.is_anonymous,
+        is_anonymous=False,
         resolved_by=doubt.resolved_by,
         created_at=doubt.created_at,
         resolved_at=doubt.resolved_at,

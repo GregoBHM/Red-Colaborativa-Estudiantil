@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Image, Alert, ScrollView, Switch, KeyboardAvoidingView, Platform, StatusBar,
+  Image, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -18,7 +18,7 @@ export default function PostScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [subjects, setSubjects] = useState([]);
   const [formData, setFormData] = useState({
-    subject_id: null, title: '', description: '', is_anonymous: false,
+    subject_id: null, title: '', description: '',
   });
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +122,7 @@ export default function PostScreen({ navigation }) {
               </View>
             )}
             <View>
-              <Text style={styles.authorName}>{formData.is_anonymous ? 'Anónimo' : user?.display_name}</Text>
+              <Text style={styles.authorName}>{user?.display_name}</Text>
               <Text style={styles.authorSub}>Publicando en el Feed</Text>
             </View>
           </View>
@@ -166,22 +166,7 @@ export default function PostScreen({ navigation }) {
             multiline numberOfLines={4} textAlignVertical="top"
           />
 
-          {/* Anonymous toggle */}
-          <View style={styles.switchRow}>
-            <View style={styles.switchInfo}>
-              <Ionicons name="eye-off-outline" size={20} color={COLORS.textSecondary} style={{ marginRight: 10 }} />
-              <View>
-                <Text style={styles.switchLabel}>Publicar anónimamente</Text>
-                <Text style={styles.switchSub}>Se ocultará tu nombre y foto</Text>
-              </View>
-            </View>
-            <Switch
-              value={formData.is_anonymous}
-              onValueChange={(val) => setFormData({ ...formData, is_anonymous: val })}
-              trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
-              thumbColor={formData.is_anonymous ? COLORS.primary : COLORS.surface}
-            />
-          </View>
+
 
           {/* Image picker */}
           <Text style={styles.label}>Imagen</Text>
@@ -250,13 +235,7 @@ const styles = StyleSheet.create({
   },
   textArea: { height: 120 },
   charCount: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, textAlign: 'right', marginTop: 4 },
-  switchRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: SPACING.lg, paddingVertical: SPACING.md, borderTopWidth: 0.5, borderTopColor: COLORS.borderLight,
-  },
-  switchInfo: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  switchLabel: { fontSize: FONTS.sizes.md, fontWeight: '600', color: COLORS.textPrimary },
-  switchSub: { fontSize: FONTS.sizes.xs, color: COLORS.textSecondary, marginTop: 2 },
+
   imagePicker: {
     height: 160, borderRadius: RADIUS.md, backgroundColor: COLORS.background,
     borderWidth: 2, borderColor: COLORS.borderLight, borderStyle: 'dashed',
