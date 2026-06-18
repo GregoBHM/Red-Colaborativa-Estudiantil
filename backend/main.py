@@ -10,6 +10,10 @@ from routes.comments import router as comments_router
 from routes.chat import router as chat_router
 from routes.verification import router as verification_router
 from routes.reports import router as reports_router
+from routes.labs import router as labs_router
+from routes.bookmarks import router as bookmarks_router
+from models.laboratory import Laboratory
+from models.bookmark import Bookmark
 from services.upt_scraper import sync_upt_data
 from config import get_settings
 from ws_manager import manager
@@ -51,6 +55,8 @@ inner_app.include_router(comments_router, prefix="/api/v1")
 inner_app.include_router(chat_router, prefix="/api/v1")
 inner_app.include_router(verification_router, prefix="/api/v1")
 inner_app.include_router(reports_router, prefix="/api/v1")
+inner_app.include_router(labs_router, prefix="/api/v1")
+inner_app.include_router(bookmarks_router, prefix="/api/v1")
 
 
 @inner_app.on_event("startup")

@@ -74,6 +74,7 @@ class ChatMessage(Base):
             ondelete="CASCADE"),
         nullable=False)
     content = Column(Text, nullable=False)
+    msg_type = Column(String(20), default="text", nullable=False)
     is_flagged = Column(Boolean, default=False, nullable=False)
     # Read receipts: sent -> delivered -> read
     status = Column(String(20), default="sent", nullable=False)

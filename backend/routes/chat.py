@@ -45,6 +45,7 @@ class ChatRoomOut(BaseModel):
 class MessageCreate(BaseModel):
     sender_id: int
     content: str
+    msg_type: str = "text"
 
 
 class MessageOut(BaseModel):
@@ -54,6 +55,7 @@ class MessageOut(BaseModel):
     sender_name: Optional[str] = None
     sender_photo: Optional[str] = None
     content: str
+    msg_type: str = "text"
     is_flagged: bool
     status: str = "sent"
     is_deleted: bool = False
@@ -144,6 +146,7 @@ async def get_room_messages(
             sender_name=m.sender.display_name if m.sender else "Desconocido",
             sender_photo=m.sender.photo_url if m.sender else None,
             content="Este mensaje fue eliminado" if m.is_deleted else m.content,
+            msg_type=m.msg_type if not m.is_deleted else "text",
             is_flagged=m.is_flagged,
             status=m.status or "sent",
             is_deleted=m.is_deleted or False,
@@ -171,7 +174,7 @@ async def send_message(
             status_code=403,
             detail="No eres parte de esta sala")
 
-    flagged = await is_monetization_attempt(text=payload.content)
+    flagged = await is_monetization_attempt(text=payload.content if payload.msg_type == "text" else "")
 
     if flagged:
         raise HTTPException(
@@ -184,6 +187,7 @@ async def send_message(
         chat_room_id=room_id,
         sender_id=payload.sender_id,
         content=payload.content.strip(),
+        msg_type=payload.msg_type,
         is_flagged=False,
     )
     db.add(message)
@@ -199,6 +203,7 @@ async def send_message(
         sender_name=sender.display_name if sender else "Desconocido",
         sender_photo=sender.photo_url if sender else None,
         content=message.content,
+        msg_type=message.msg_type,
         is_flagged=message.is_flagged,
         status=message.status or "sent",
         is_deleted=False,
