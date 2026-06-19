@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     GOOGLE_SERVICE_ACCOUNT_JSON: str = "./google-service-account.json"
     GOOGLE_CALENDAR_ID: str = "primary"
     GEMINI_API_KEY: str = ""
+    FIREBASE_STORAGE_BUCKET: str = ""
 
     class Config:
         env_file = ".env"
