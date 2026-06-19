@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
+from sqlalchemy import text
 from routes.auth import router as auth_router
 from routes.doubts import router as doubts_router
 from routes.users import router as users_router
@@ -61,8 +62,25 @@ inner_app.include_router(bookmarks_router, prefix="/api/v1")
 inner_app.include_router(upload_router, prefix="/api/v1")
 
 
+def run_db_migrations():
+    migrations = [
+        "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS msg_type VARCHAR(20) NOT NULL DEFAULT 'text'",
+        "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'sent'",
+        "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS hidden_by JSON DEFAULT '[]'",
+        "ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS meet_link VARCHAR(500)",
+        "ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS closed_at TIMESTAMP WITH TIME ZONE",
+        "ALTER TABLE chat_rooms ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            conn.execute(text(sql))
+        conn.commit()
+
+
 @inner_app.on_event("startup")
 async def startup_event():
+    run_db_migrations()
     asyncio.create_task(sync_upt_data())
 
 

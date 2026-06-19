@@ -7,6 +7,7 @@ pydantic
 pydantic-settings
 python-multipart
 firebase-admin
+google-cloud-storage
 python-dotenv
 alembic
 google-api-python-client
