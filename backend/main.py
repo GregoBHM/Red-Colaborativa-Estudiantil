@@ -60,8 +60,6 @@ inner_app.include_router(reports_router, prefix="/api/v1")
 inner_app.include_router(labs_router, prefix="/api/v1")
 inner_app.include_router(bookmarks_router, prefix="/api/v1")
 inner_app.include_router(upload_router, prefix="/api/v1")
-
-
 def run_db_migrations():
     migrations = [
         "ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS msg_type VARCHAR(20) NOT NULL DEFAULT 'text'",
@@ -77,10 +75,10 @@ def run_db_migrations():
             conn.execute(text(sql))
         conn.commit()
 
+run_db_migrations()
 
 @inner_app.on_event("startup")
 async def startup_event():
-    run_db_migrations()
     asyncio.create_task(sync_upt_data())
 
 

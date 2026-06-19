@@ -29,7 +29,7 @@ else:
     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
 
 firebase_app = firebase_admin.initialize_app(cred, {
-    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET", ""),
+    "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
 })
 
 
