@@ -78,36 +78,6 @@ class MeetOut(BaseModel):
     scheduled_at: datetime
 
 
-
-def _build_room_out(db: Session, room: ChatRoom) -> ChatRoomOut:
-    mentor = db.query(User).filter(User.id == room.mentor_id).first()
-    student = db.query(User).filter(User.id == room.student_id).first()
-    doubt = db.query(Doubt).filter(Doubt.id == room.doubt_id).first()
-    last_msg = (
-        db.query(ChatMessage)
-        .filter(ChatMessage.chat_room_id == room.id, ChatMessage.is_deleted.is_(False))
-        .order_by(ChatMessage.created_at.desc())
-        .first()
-    )
-    return ChatRoomOut(
-        id=room.id,
-        doubt_id=room.doubt_id,
-        doubt_title=doubt.title if doubt else None,
-        mentor_id=room.mentor_id,
-        mentor_name=mentor.display_name if mentor else None,
-        mentor_photo=mentor.photo_url if mentor else None,
-        student_id=room.student_id,
-        student_name=student.display_name if student else None,
-        student_photo=student.photo_url if student else None,
-        status=room.status,
-        scheduled_at=room.scheduled_at,
-        meet_link=room.meet_link,
-        created_at=room.created_at,
-        closed_at=room.closed_at,
-        last_message=last_msg.content if last_msg else None,
-    )
-
-
 @router.post("/rooms", response_model=ChatRoomOut,
              status_code=status.HTTP_201_CREATED)
 async def create_chat_room(
