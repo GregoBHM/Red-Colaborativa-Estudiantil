@@ -52,6 +52,7 @@ jobs:
           GEMINI_API_KEY: ""
           FIREBASE_CREDENTIALS_PATH: ""
           GOOGLE_SERVICE_ACCOUNT_JSON: ""
+          FIREBASE_STORAGE_BUCKET: ""
         run: python -c "import main; print('✅ App imports OK')"
         continue-on-error: true
 

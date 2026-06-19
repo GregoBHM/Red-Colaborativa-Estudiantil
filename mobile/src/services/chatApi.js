@@ -45,11 +45,11 @@ export async function getChatMessages(roomId) {
   return await res.json();
 }
 
-export async function sendMessage(roomId, senderId, content) {
+export async function sendMessage(roomId, senderId, content, msgType = 'text') {
   const res = await fetch(`${API.BASE_URL}/api/v1/chat/rooms/${roomId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sender_id: senderId, content }),
+    body: JSON.stringify({ sender_id: senderId, content, msg_type: msgType }),
   });
   if (!res.ok) {
     const errMsg = await parseErrorResponse(res, 'Error al enviar mensaje');

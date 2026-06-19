@@ -14,10 +14,12 @@ export const API = {
     SUBJECTS: `${API_BASE_URL}/api/v1/doubts/subjects`,
     LEADERBOARD: `${API_BASE_URL}/api/v1/users/leaderboard`,
     REPORTS: `${API_BASE_URL}/api/v1/reports`,
+    BOOKMARKS: `${API_BASE_URL}/api/v1/bookmarks`,
     USER_PROFILE: (id) => `${API_BASE_URL}/api/v1/users/${id}`,
     USER_STATS: (id) => `${API_BASE_URL}/api/v1/users/${id}/stats`,
     DOUBT_RESOLVE: (id) => `${API_BASE_URL}/api/v1/doubts/${id}/resolve`,
     DOUBT_EDIT: (id) => `${API_BASE_URL}/api/v1/doubts/${id}`,
+    UPLOAD_IMAGE: `${API_BASE_URL}/api/v1/upload/image`,
   },
 };
 

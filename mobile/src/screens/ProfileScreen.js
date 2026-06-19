@@ -107,12 +107,18 @@ export default function ProfileScreen() {
       <View style={[styles.headerBg, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Mi Perfil</Text>
-          {user?.role === 'admin' && (
-            <TouchableOpacity onPress={() => navigation.navigate('AdminDashboard')} style={styles.adminBtn} activeOpacity={0.7}>
-              <Ionicons name="shield-checkmark" size={16} color={COLORS.accent} />
-              <Text style={styles.adminBtnText}>Admin</Text>
+          <View style={{flexDirection: 'row', gap: 8}}>
+            <TouchableOpacity onPress={() => navigation.navigate('Labs')} style={styles.adminBtn} activeOpacity={0.7}>
+              <Ionicons name="business" size={16} color={COLORS.textLight} />
+              <Text style={[styles.adminBtnText, {color: COLORS.textLight}]}>Labs</Text>
             </TouchableOpacity>
-          )}
+            {user?.role === 'admin' && (
+              <TouchableOpacity onPress={() => navigation.navigate('AdminDashboard')} style={styles.adminBtn} activeOpacity={0.7}>
+                <Ionicons name="shield-checkmark" size={16} color={COLORS.accent} />
+                <Text style={styles.adminBtnText}>Admin</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 

@@ -8,8 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Audio } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
 import { getChatMessages, sendMessage, closeChatRoom, scheduleSession, markMessagesRead, softDeleteMessage, createMeetLink, deleteMeetLink } from '../services/chatApi';
+import { uploadFileToStorage } from '../services/storageApi';
 import { wsService } from '../services/websocket';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
@@ -30,6 +32,10 @@ export default function ChatScreen({ route, navigation }) {
   const [scheduling, setScheduling] = useState(false);
   const [creatingMeet, setCreatingMeet] = useState(false);
   const [meetLink, setMeetLink] = useState(room.meet_link || null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [playingAudio, setPlayingAudio] = useState(null);
+  const recordingRef = useRef(null);
+  const soundRef = useRef(null);
   
   // DateTimePicker state
   const [pickerDate, setPickerDate] = useState(new Date(Date.now() + 86400000)); // tomorrow
@@ -159,6 +165,10 @@ export default function ChatScreen({ route, navigation }) {
       wsService.off('messages_read', handleMessagesRead);
       wsService.off('messages_delivered', handleMessagesDelivered);
       wsService.off('message_deleted', handleMessageDeleted);
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
     };
   }, [room.id, loadMessages, navigation]);
 
@@ -168,12 +178,71 @@ export default function ChatScreen({ route, navigation }) {
     setText('');
     setSending(true);
     try {
-      await sendMessage(room.id, user.id, content);
+      await sendMessage(room.id, user.id, content, 'text');
     } catch (err) {
       Alert.alert('Error', err.message);
       setText(content);
     } finally {
       setSending(false);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Necesitamos acceso al micrófono.');
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.LOW_QUALITY
+      );
+      recordingRef.current = recording;
+      setIsRecording(true);
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo iniciar la grabación: ' + err.message);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recordingRef.current) return;
+    setIsRecording(false);
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      if (!uri) return;
+      setSending(true);
+      const filename = `audio_${Date.now()}.m4a`;
+      const audioUrl = await uploadFileToStorage(uri, `chats/${room.id}/${filename}`, 'audio/m4a');
+      await sendMessage(room.id, user.id, audioUrl, 'audio');
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo enviar el audio.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const playAudio = async (url, messageId) => {
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    if (playingAudio === messageId) {
+      setPlayingAudio(null);
+      return;
+    }
+    try {
+      const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
+      soundRef.current = sound;
+      setPlayingAudio(messageId);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) setPlayingAudio(null);
+      });
+    } catch (err) {
+      Alert.alert('Error', 'No se pudo reproducir el audio.');
     }
   };
 
@@ -332,7 +401,16 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const formatTime = (date) => {
-    return date.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  const formatMsgTime = (isoString) => {
+    const d = new Date(isoString);
+    const h = d.getHours().toString().padStart(2, '0');
+    const m = d.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
   };
 
   const handleLongPressMessage = (item) => {
@@ -428,6 +506,20 @@ export default function ChatScreen({ route, navigation }) {
               <Ionicons name="ban-outline" size={14} color={COLORS.textMuted} style={{ marginRight: 4 }} />
               <Text style={styles.deletedText}>Este mensaje fue eliminado</Text>
             </View>
+          ) : item.msg_type === 'audio' ? (
+            <TouchableOpacity style={styles.audioBubble} onPress={() => playAudio(item.content, item.id)} activeOpacity={0.7}>
+              <Ionicons
+                name={playingAudio === item.id ? 'pause-circle' : 'play-circle'}
+                size={30}
+                color={isMe ? COLORS.textLight : COLORS.primary}
+              />
+              <View style={styles.audioWave}>
+                {[3,5,8,6,4,7,5,3,6,4].map((h, i) => (
+                  <View key={i} style={[styles.audioBar, { height: h * 2, backgroundColor: isMe ? 'rgba(255,255,255,0.7)' : COLORS.primaryLight }]} />
+                ))}
+              </View>
+              <Text style={[styles.audioLabel, isMe && { color: 'rgba(255,255,255,0.8)' }]}>Audio</Text>
+            </TouchableOpacity>
           ) : (
             <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
           )}
@@ -436,7 +528,7 @@ export default function ChatScreen({ route, navigation }) {
               <Ionicons name="warning" size={12} color={isMe ? '#FFD166' : COLORS.accent} style={{ marginRight: 4 }} />
             )}
             <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
-              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {formatMsgTime(item.created_at)}
             </Text>
             {getCheckmarkIcon(item.status, isMe)}
           </View>
@@ -448,8 +540,8 @@ export default function ChatScreen({ route, navigation }) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : insets.top}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primaryDark} />
       <LoadingOverlay visible={closing} message="Cerrando sesión..." />
@@ -542,12 +634,12 @@ export default function ChatScreen({ route, navigation }) {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={[...messages].reverse()}
         keyExtractor={item => item.id.toString()}
         renderItem={renderMessage}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        inverted
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           !loading && (
@@ -574,7 +666,7 @@ export default function ChatScreen({ route, navigation }) {
 
       {/* Input */}
       {!isClosed ? (
-        <View style={[styles.inputRow, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={[styles.inputRow, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
           <TextInput
             style={styles.input}
             placeholder="Escribe un mensaje..."
@@ -584,6 +676,14 @@ export default function ChatScreen({ route, navigation }) {
             multiline
             maxLength={1000}
           />
+          <TouchableOpacity
+            style={[styles.micBtn, isRecording && styles.micBtnActive]}
+            onPressIn={startRecording}
+            onPressOut={stopRecording}
+            disabled={sending}
+          >
+            <Ionicons name={isRecording ? 'radio-button-on' : 'mic-outline'} size={20} color={isRecording ? COLORS.error : COLORS.textMuted} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
             onPress={handleSend}
@@ -825,7 +925,6 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { fontSize: FONTS.sizes.sm, fontWeight: '700', color: COLORS.textLight },
   
-  // Input — Matches DoubtDetailScreen comment input
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: SPACING.md, paddingTop: 10,
     backgroundColor: COLORS.surface, borderTopWidth: 0.5, borderTopColor: COLORS.borderLight,
@@ -833,12 +932,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: SPACING.md,
-    paddingVertical: 10, fontSize: FONTS.sizes.sm, color: COLORS.textPrimary, maxHeight: 100,
+    paddingVertical: 10, fontSize: FONTS.sizes.sm, color: COLORS.textPrimary, maxHeight: 150,
     borderWidth: 0.5, borderColor: COLORS.border,
   },
   sendBtn: {
     width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 2,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', marginBottom: 2,
   },
   sendBtnDisabled: { opacity: 0.4 },
   
@@ -893,5 +992,15 @@ const styles = StyleSheet.create({
   pickerButtonText: {
     flex: 1, fontSize: FONTS.sizes.md, color: COLORS.textPrimary, fontWeight: '600',
   },
+  micBtn: {
+    width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: COLORS.background,
+    alignItems: 'center', justifyContent: 'center', marginRight: 6, borderWidth: 1,
+    borderColor: COLORS.borderLight, alignSelf: 'flex-end', marginBottom: 2,
+  },
+  micBtnActive: { backgroundColor: COLORS.errorSoft, borderColor: COLORS.error },
+  audioBubble: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, minWidth: 140 },
+  audioWave: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
+  audioBar: { width: 3, borderRadius: 2 },
+  audioLabel: { fontSize: FONTS.sizes.xs, color: COLORS.textSecondary, fontWeight: '600' },
 });
 

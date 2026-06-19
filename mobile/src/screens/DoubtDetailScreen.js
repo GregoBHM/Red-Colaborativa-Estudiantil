@@ -13,6 +13,7 @@ import { deleteDoubt, toggleLikeDoubt } from '../services/doubtsApi';
 import { getComments, createComment, deleteComment, toggleLikeComment } from '../services/commentsApi';
 import { createChatRoom } from '../services/chatApi';
 import { uploadImage } from '../services/storageApi';
+import { toggleBookmark, getMyBookmarkIds } from '../services/bookmarksApi';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../constants/theme';
 
@@ -28,6 +29,7 @@ export default function DoubtDetailScreen({ route, navigation }) {
   const [sendingComment, setSendingComment] = useState(false);
   const [liked, setLiked] = useState((doubt.liked_by || []).includes(user?.id));
   const [likesCount, setLikesCount] = useState(doubt.likes_count || 0);
+  const [bookmarked, setBookmarked] = useState(false);
   const isAuthor = user?.id === doubt.author_id;
   const isAdmin = user?.role === 'admin';
 
@@ -51,7 +53,14 @@ export default function DoubtDetailScreen({ route, navigation }) {
     }
   }, [doubt.id]);
 
-  useEffect(() => { loadComments(); }, [loadComments]);
+  useEffect(() => {
+    loadComments();
+    if (user?.id) {
+      getMyBookmarkIds(user.id).then(({ bookmark_ids }) => {
+        setBookmarked((bookmark_ids || []).includes(doubt.id));
+      }).catch(() => {});
+    }
+  }, [loadComments]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() && !commentImage) return;
@@ -98,6 +107,15 @@ export default function DoubtDetailScreen({ route, navigation }) {
     } catch (err) {
       setLiked(liked);
       setLikesCount(prev => liked ? prev + 1 : prev - 1);
+    }
+  };
+
+  const handleBookmark = async () => {
+    setBookmarked(!bookmarked);
+    try {
+      await toggleBookmark(user.id, doubt.id);
+    } catch (err) {
+      setBookmarked(bookmarked);
     }
   };
 
@@ -220,6 +238,13 @@ export default function DoubtDetailScreen({ route, navigation }) {
             <Ionicons name="chatbubble-outline" size={20} color={COLORS.textSecondary} />
             <Text style={styles.likeCount}>{comments.length}</Text>
           </View>
+          <TouchableOpacity style={styles.likeBtn} onPress={handleBookmark} activeOpacity={0.6}>
+            <Ionicons
+              name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+              size={22}
+              color={bookmarked ? COLORS.primary : COLORS.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
       </Animated.View>
 

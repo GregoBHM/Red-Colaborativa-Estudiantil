@@ -15,22 +15,25 @@ export default function AdminDashboardScreen({ navigation }) {
   const adminId = user?.id;
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [whitelist, setWhitelist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sending, setSending] = useState(false);
   const [activeTab, setActiveTab] = useState('stats');
   const [announcement, setAnnouncement] = useState({ title: '', body: '' });
+  const [wlEmail, setWlEmail] = useState('');
+  const [wlRole, setWlRole] = useState('student');
 
   const loadData = useCallback(async () => {
     try {
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, wlRes] = await Promise.all([
         fetch(`${API.BASE_URL}/api/v1/admin/stats?admin_id=${adminId}`),
         fetch(`${API.BASE_URL}/api/v1/admin/users?admin_id=${adminId}`),
+        fetch(`${API.BASE_URL}/api/v1/admin/whitelist?admin_id=${adminId}`),
       ]);
-      const statsData = await statsRes.json();
-      const usersData = await usersRes.json();
-      setStats(statsData);
-      setUsers(usersData);
+      setStats(await statsRes.json());
+      setUsers(await usersRes.json());
+      setWhitelist(await wlRes.json());
     } catch (err) {
       console.error('Error loading admin data:', err);
     } finally {
@@ -83,6 +86,43 @@ export default function AdminDashboardScreen({ navigation }) {
     }
   };
 
+  const addToWhitelist = async () => {
+    if (!wlEmail.trim()) {
+      Alert.alert('Campo requerido', 'Escribe un correo.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API.BASE_URL}/api/v1/admin/whitelist?admin_id=${adminId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: wlEmail.trim(), role: wlRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Error');
+      setWhitelist(prev => [data, ...prev]);
+      setWlEmail('');
+      Alert.alert('✅ Acceso concedido', `${data.email} puede acceder a la plataforma.`);
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    }
+  };
+
+  const removeFromWhitelist = (entry) => {
+    Alert.alert('Eliminar acceso', `¿Revocar el acceso de ${entry.email}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive', onPress: async () => {
+          try {
+            await fetch(`${API.BASE_URL}/api/v1/admin/whitelist/${entry.id}?admin_id=${adminId}`, { method: 'DELETE' });
+            setWhitelist(prev => prev.filter(e => e.id !== entry.id));
+          } catch (err) {
+            Alert.alert('Error', 'No se pudo eliminar.');
+          }
+        }
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
@@ -105,19 +145,19 @@ export default function AdminDashboardScreen({ navigation }) {
       </View>
 
       <View style={styles.tabRow}>
-        {['stats', 'users', 'announce'].map(tab => (
+        {['stats', 'users', 'whitelist', 'announce'].map(tab => (
           <TouchableOpacity
             key={tab}
             style={[styles.tab, activeTab === tab && styles.tabActive]}
             onPress={() => setActiveTab(tab)}
           >
             <Ionicons
-              name={tab === 'stats' ? 'bar-chart-outline' : tab === 'users' ? 'people-outline' : 'megaphone-outline'}
+              name={tab === 'stats' ? 'bar-chart-outline' : tab === 'users' ? 'people-outline' : tab === 'whitelist' ? 'key-outline' : 'megaphone-outline'}
               size={16}
               color={activeTab === tab ? COLORS.primary : COLORS.textMuted}
             />
             <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab === 'stats' ? 'Resumen' : tab === 'users' ? 'Usuarios' : 'Anuncio'}
+              {tab === 'stats' ? 'Stats' : tab === 'users' ? 'Usuarios' : tab === 'whitelist' ? 'Accesos' : 'Anuncio'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -225,6 +265,63 @@ export default function AdminDashboardScreen({ navigation }) {
             </Animated.View>
           )}
         />
+      )}
+
+      {activeTab === 'whitelist' && (
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.announceCard}>
+            <View style={styles.announceIconRow}>
+              <Ionicons name="key" size={24} color={COLORS.primary} />
+              <Text style={styles.announceTitle}>Accesos Especiales</Text>
+            </View>
+            <Text style={styles.announceSub}>Agrega correos externos (profesores, invitados) para que puedan acceder sin código de estudiante.</Text>
+            <Text style={styles.inputLabel}>Correo Electrónico</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="profesor@ejemplo.com"
+              placeholderTextColor={COLORS.textMuted}
+              value={wlEmail}
+              onChangeText={setWlEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Text style={styles.inputLabel}>Tipo de Acceso</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.md }}>
+              {['student', 'admin'].map(r => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.roleChip, wlRole === r && styles.roleChipActive]}
+                  onPress={() => setWlRole(r)}
+                >
+                  <Text style={[styles.roleChipText, wlRole === r && styles.roleChipTextActive]}>
+                    {r === 'student' ? 'Invitado' : 'Administrador'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.sendBtn} onPress={addToWhitelist} activeOpacity={0.8}>
+              <Ionicons name="add-circle" size={18} color={COLORS.textLight} style={{ marginRight: 8 }} />
+              <Text style={styles.sendBtnText}>Conceder Acceso</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {whitelist.length > 0 && (
+            <View style={[styles.announceCard, { marginTop: SPACING.md }]}>
+              <Text style={[styles.summaryTitle, { marginBottom: SPACING.sm }]}>Correos con Acceso</Text>
+              {whitelist.map((entry, i) => (
+                <View key={entry.id} style={[styles.summaryRow, i === whitelist.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.summaryValue}>{entry.email}</Text>
+                    <Text style={[styles.summaryLabel, { marginTop: 2 }]}>{entry.role === 'admin' ? 'Administrador' : 'Invitado'}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeFromWhitelist(entry)} style={{ padding: 6 }}>
+                    <Ionicons name="trash-outline" size={18} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       )}
 
       {activeTab === 'announce' && (
@@ -346,4 +443,11 @@ const styles = StyleSheet.create({
     ...SHADOWS.medium,
   },
   sendBtnText: { fontSize: FONTS.sizes.md, fontWeight: '700', color: COLORS.textLight },
+  roleChip: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: RADIUS.full,
+    borderWidth: 1.5, borderColor: COLORS.borderLight, backgroundColor: COLORS.background,
+  },
+  roleChipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primarySoft },
+  roleChipText: { fontSize: FONTS.sizes.sm, fontWeight: '600', color: COLORS.textSecondary },
+  roleChipTextActive: { color: COLORS.primary },
 });

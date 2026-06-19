@@ -9,6 +9,7 @@ import DoubtDetailScreen from '../screens/DoubtDetailScreen';
 import ChatScreen from '../screens/ChatScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SearchScreen from '../screens/SearchScreen';
+import LabsScreen from '../screens/LabsScreen';
 import MainTabs from './MainTabs';
 import SplashTransition from '../components/SplashTransition';
 
@@ -68,6 +69,11 @@ export default function AppNavigator() {
               <Stack.Screen
                 name="Search"
                 component={SearchScreen}
+                options={{ animation: 'slide_from_right' }}
+              />
+              <Stack.Screen
+                name="Labs"
+                component={LabsScreen}
                 options={{ animation: 'slide_from_right' }}
               />
             </>
