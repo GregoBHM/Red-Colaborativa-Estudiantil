@@ -77,13 +77,13 @@ def run_db_migrations():
             conn.execute(text(sql))
         conn.commit()
 
+
 run_db_migrations()
 
 
 @inner_app.on_event("startup")
 async def startup_event():
     asyncio.create_task(sync_upt_data())
-
 
 
 @inner_app.get("/")
